@@ -1,0 +1,151 @@
+<html>
+    <head>
+        <script id="fragmentProgram" type="x-shader/x-fragment">
+            void main(void)
+            {
+                gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+            }
+        </script>
+        <script id="vertexProgram" type="x-shader/x-vertex">
+            attribute vec3 aVertexPosition;
+
+            uniform mat4 uModelViewMatrix;
+            uniform mat4 uProjectionMatrix;
+
+            void main(void)
+            {
+                gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aVertexPosition, 1.0);
+            }
+        </script>
+        <script type="text/javascript" src="shaders.js"></script>
+        <script type="text/javascript" src="scenegraph.js"></script>
+        <script type="text/javascript" src="linalg.js"></script>
+        <script type="text/javascript" charset="utf-8">
+            var gl
+            var g_shaderprogram
+            var g_timer
+
+            var gamesettings =
+                { dt: 33
+                }
+
+            var renderstate =
+                { projectionstack: []
+                , modelviewstack: []
+                }
+
+            var gs
+
+            function GameState()
+            {
+                var uModelViewMatrix = gl.getUniformLocation(g_shaderprogram, "uModelViewMatrix")
+                var aVertexPosition = gl.getAttribLocation(g_shaderprogram, "aVertexPosition")
+
+                this.sgroot = new SGNode()
+                this.gameroot = this.sgroot.attach(new DollyNode(uModelViewMatrix))
+                this.uiroot = this.sgroot.attach(new IdentityNode())
+
+                this.gameroot.attach(new RenderNode(aVertexPosition))
+                this.uiroot.attach(new RenderNode(aVertexPosition))
+                this.gameroot.pan(0.5, 0.0, 0.0)
+
+                this.panning = false
+                this.scanning = false
+            }
+
+            function initGL(canvas)
+            {
+                gl = canvas.getContext("experimental-webgl")
+                if (!gl)
+                {
+                    throw "Unable to initialize WebGL"
+                }
+
+                gl.viewport(0, 0, canvas.width, canvas.height)
+                gl.clearColor(0.0, 0.0, 0.0, 1.0)
+                gl.enable(gl.DEPTH_TEST)
+            }
+
+            function checkGLError()
+            {
+                var errorvalue = gl.getError()
+                if (errorvalue != gl.NO_ERROR)
+                {
+                    throw ("GL error: " + errorvalue)
+                }
+            }
+
+            function initShaders()
+            {
+                var vertexShader = loadShader("vertexProgram")
+                var fragmentShader = loadShader("fragmentProgram")
+                g_shaderprogram = linkShaderProgram([vertexShader, fragmentShader])
+
+                gl.useProgram(g_shaderprogram)
+                    
+                var uModelViewMatrix = gl.getUniformLocation(g_shaderprogram, "uModelViewMatrix")
+                var uProjectionMatrix = gl.getUniformLocation(g_shaderprogram, "uProjectionMatrix")
+
+                gl.uniformMatrix4fv(uModelViewMatrix, false, identityMatrix4)
+                gl.uniformMatrix4fv(uProjectionMatrix, false, identityMatrix4)
+            }
+
+            function initGame()
+            {
+                gs = new GameState()
+
+                timerProxy()
+            }
+
+            function timerProxy()
+            {
+                update()
+                draw()
+                g_timer = setTimeout(timerProxy, gamesettings.dt)
+            }
+
+            function handleinput()
+            {
+            }
+
+            function update()
+            {
+            }
+
+            function draw()
+            {
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+                gs.sgroot.update(identityMatrix4)
+            }
+
+            function init()
+            {
+                try
+                {
+                    var canvas = document.getElementById("glcanvas")
+                    initGL(canvas)
+                    initShaders()
+                    initGame()
+                    checkGLError()
+                }
+                catch(e)
+                {
+                    setMessage("Could not initialize: " + e)
+                }
+            }
+
+            function setMessage(msg)
+            {
+                var msgdiv = document.getElementById("msg")
+                msgdiv.innerHTML = msg
+            }
+        </script>
+    </head>
+    <body onload="init()">
+        <canvas id="glcanvas" width="640" height="480">
+            Looks like there's no support for HTML5 Canvas =(
+        </canvas>
+        <div id="msg">
+        </div>
+    </body>
+</html>
