@@ -29,24 +29,57 @@
                 { dt: 33
                 }
 
-            var renderstate =
-                { projectionstack: []
-                , modelviewstack: []
-                }
-
+            var renderstate
             var gs
+
+            function RenderState(matrixUniforms)
+            {
+                this.PROJECTION_STACK = 0
+                this.MODELVIEW_STACK = 1
+
+                this.matrixUniforms = matrixUniforms
+                this.transformstack = []
+
+                for (var i = 0; i < matrixUniforms.length; i++)
+                {
+                    this.transformstack.push([identityMatrix4.slice(0)])
+                }
+            }
+
+            function pixelTransform()
+            {
+                var viewportdim = gl.getParameter(gl.VIEWPORT)
+                var width = viewportdim[2]
+                var height = viewportdim[3]
+
+                var translateM = translationMatrix4(-width, -height, 0)
+                var scaleM = identityMatrix4.slice(0)
+                scaleM[at4(0, 0)] = 1 / width
+                scaleM[at4(1, 1)] = -1 / height
+
+                var m = mat4mul(translateM, scaleM)
+                return m
+            }
 
             function GameState()
             {
-                var uModelViewMatrix = gl.getUniformLocation(g_shaderprogram, "uModelViewMatrix")
                 var aVertexPosition = gl.getAttribLocation(g_shaderprogram, "aVertexPosition")
 
                 this.sgroot = new SGNode()
-                this.gameroot = this.sgroot.attach(new DollyNode(uModelViewMatrix))
-                this.uiroot = this.sgroot.attach(new IdentityNode())
+                this.gameroot = new DollyNode(renderstate.PROJECTION_STACK)
+                this.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, pixelTransform())
 
-                this.gameroot.attach(new RenderNode(aVertexPosition))
-                this.uiroot.attach(new RenderNode(aVertexPosition))
+                this.sgroot.attach(this.gameroot)
+                this.sgroot.attach(this.uiroot)
+
+                this.gameroot
+                    .attach(new ApplyTransform([0, 1]))
+                    .attach(new RenderNode(aVertexPosition))
+                this.uiroot
+                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(100)))
+                    .attach(new ApplyTransform([0, 1]))
+                    .attach(new RenderNode(aVertexPosition))
+
                 this.gameroot.pan(0.5, 0.0, 0.0)
 
                 this.panning = false
@@ -82,16 +115,14 @@
                 g_shaderprogram = linkShaderProgram([vertexShader, fragmentShader])
 
                 gl.useProgram(g_shaderprogram)
-                    
-                var uModelViewMatrix = gl.getUniformLocation(g_shaderprogram, "uModelViewMatrix")
-                var uProjectionMatrix = gl.getUniformLocation(g_shaderprogram, "uProjectionMatrix")
-
-                gl.uniformMatrix4fv(uModelViewMatrix, false, identityMatrix4)
-                gl.uniformMatrix4fv(uProjectionMatrix, false, identityMatrix4)
             }
 
             function initGame()
             {
+                var uModelViewMatrix = gl.getUniformLocation(g_shaderprogram, "uModelViewMatrix")
+                var uProjectionMatrix = gl.getUniformLocation(g_shaderprogram, "uProjectionMatrix")
+
+                renderstate = new RenderState([uProjectionMatrix, uModelViewMatrix])
                 gs = new GameState()
 
                 timerProxy()
@@ -115,12 +146,12 @@
             function draw()
             {
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-                gs.sgroot.update(identityMatrix4)
+                gs.sgroot.update(renderstate)
             }
 
             function init()
             {
-                try
+            //    try
                 {
                     var canvas = document.getElementById("glcanvas")
                     initGL(canvas)
@@ -128,10 +159,30 @@
                     initGame()
                     checkGLError()
                 }
-                catch(e)
+              /*  catch(e)
                 {
                     setMessage("Could not initialize: " + e)
-                }
+                }*/
+            }
+
+            function onKeyDown(e)
+            {
+            }
+
+            function onKeyUp(e)
+            {
+            }
+
+            function onMouseDown(e)
+            {
+            }
+
+            function onMouseUp(e)
+            {
+            }
+
+            function onMouseMove(e)
+            {
             }
 
             function setMessage(msg)
@@ -142,7 +193,12 @@
         </script>
     </head>
     <body onload="init()">
-        <canvas id="glcanvas" width="640" height="480">
+        <canvas id="glcanvas" width="640" height="480" 
+                onkeydown="onKeyDown(event)" 
+                onkeyup="onKeyUp(event)"
+                onmousedown="onMouseDown(event)"
+                onmouseup="onMouseUp(event)"
+                onmousemove="onMouseMove(event)">
             Looks like there's no support for HTML5 Canvas =(
         </canvas>
         <div id="msg">

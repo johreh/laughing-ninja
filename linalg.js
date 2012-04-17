@@ -49,9 +49,9 @@ function scaleMatrix4(scale)
 function translationMatrix4(x, y, z)
 {
     var m = identityMatrix4.slice(0)
-    m[at4(3, 0)] = x
-    m[at4(3, 1)] = y
-    m[at4(3, 2)] = z
+    m[12] = x
+    m[13] = y
+    m[14] = z
     return m
 }
 
@@ -59,3 +59,4 @@ function at4(row, col)
 {
     return row*4 + col
 }
+

@@ -20,51 +20,64 @@ function SGNode()
         }
     }
 
-    this.update = function(m)
+    this.update = function(rs)
     {
-        var m2 = this.doUpdate(m)
-        for (var i = 0; i < this.children.length; i++)
-        {
-            this.children[i].update(m2)
-        }
+        this.updateChildren(rs)
     }
 
-    this.doUpdate = function(m) 
+    this.updateChildren = function(rs)
     {
-        return m
+        for (var i = 0; i < this.children.length; i++)
+        {
+            this.children[i].update(rs)
+        }
     }
 }
 
-function IdentityNode(matrixUniform)
+function TransformNode(stack)
 {
     SGNode.call(this)
-    this.matrixUniform = matrixUniform
+    this.stack = stack
 
-    this.doUpdate = function(m)
+    this.update = function(rs)
     {
-        gl.uniformMatrix4fv(this.matrixUniform, false, identityMatrix4)
+        var m = this.calculateMatrix(rs)
+
+        rs.transformstack[this.stack].unshift(m)
+        this.updateChildren(rs)
+        rs.transformstack[this.stack].shift()
+    }
+
+    this.calculateMatrix = function(rs)
+    {
         return identityMatrix4
     }
 }
 
-function TransformNode(matrixUniform, transform)
+function MatrixNode(stack, matrix)
 {
-    SGNode.call(this)
-    this.matrixUniform = matrixUniform
-    this.matrix = transform.slice(0)
+    TransformNode.call(this, stack)
+    this.matrix = matrix.slice(0)
 
-    this.doUpdate = function(m)
+    this.calculateMatrix = function(rs)
     {
-        var mtrans = mat4mul(this.matrix, m)
-        gl.uniformMatrix4fv(this.matrixUniform, false, mtrans)
-        return mtrans
+        return mat4mul(this.matrix, rs.transformstack[this.stack][0])
     }
 }
 
-function DollyNode(matrixUniform)
+function IdentityNode(stack)
 {
-    SGNode.call(this)
-    this.matrixUniform = matrixUniform
+    TransformNode.call(this, stack)
+
+    this.calculateMatrix = function(rs)
+    {
+        return identityMatrix4
+    }
+}
+
+function DollyNode(stack)
+{
+    TransformNode.call(this, stack)
     this.x = 0
     this.y = 0
     this.z = 0
@@ -72,9 +85,9 @@ function DollyNode(matrixUniform)
     this.pitch = 0
     this.d = 0.0
 
-    this.doUpdate = function(m)
+    this.calculateMatrix = function(rs)
     {
-        var zoomM = scaleMatrix4(this.d)
+//        var zoomM = scaleMatrix4(this.d)
         var translateM = translationMatrix4(this.x, this.y, this.z)
 
         var yawM = identityMatrix4.slice(0)
@@ -92,12 +105,11 @@ function DollyNode(matrixUniform)
         var dM = identityMatrix4.slice(0)
         dM[at4(2, 2)] = this.d
         
-        m = mat4mul(translateM, m)
+        var m = mat4mul(translateM, rs.transformstack[this.stack][0])
         m = mat4mul(yawM, m)
         m = mat4mul(pitchM, m)
         m = mat4mul(dM, m)
-        
-        gl.uniformMatrix4fv(this.matrixUniform, false, m)
+
         return m
     }
 
@@ -120,22 +132,38 @@ function DollyNode(matrixUniform)
     }
 }
 
+function ApplyTransform(stacks)
+{
+    SGNode.call(this)
+    this.stacks = stacks
+
+    this.update = function(rs)
+    {
+        for (var i = 0; i < this.stacks.length; i++)
+        {
+            gl.uniformMatrix4fv(rs.matrixUniforms[i], false, rs.transformstack[i][0])
+        }
+        this.updateChildren()
+    }
+}
+
 function RenderNode(aVertexPosition)
 {
     SGNode.call(this)
     this.aVertexPosition = aVertexPosition
 
-    this.doUpdate = function(m)
+    this.update = function(rs)
     {
         var triangle = 
             [ -0.5,  0.5,  0.0
-            ,  0.0, -0.5,  0.0
+            , -0.5, -0.5,  0.0
             ,  0.5,  0.5,  0.0
+            ,  0.5, -0.5,  0.0
             ]
 
         var triangleVertexBuffer = gl.createBuffer()
         gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexBuffer)
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangle), gl.STATIC_DRAW)
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangle), gl.STREAM_DRAW)
 
         gl.vertexAttribPointer(
             this.aVertexPosition,     // Attribute
@@ -146,11 +174,9 @@ function RenderNode(aVertexPosition)
             0)          // Buffer offset
 
         gl.enableVertexAttribArray(this.aVertexPosition)
-        gl.drawArrays(gl.TRIANGLES, 0, 3)
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
         gl.deleteBuffer(triangleVertexBuffer)
-
-        return m
     }
 }
 
