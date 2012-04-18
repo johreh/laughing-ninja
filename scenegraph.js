@@ -1,7 +1,7 @@
 function SGNode()
 {
     SGNode.DRAW = 0
-    SGNode.PICK = 1
+    SGNode.CALLBACK = 1
 
     this.children = []
     this.parent = null
@@ -171,26 +171,40 @@ function ApplyTransform(stacks)
     }
 }
 
-function BBoxNode(bag)
+function CallbackNode()
 {
     SGNode.call(this)
+
     this.update = function(rs)
     {
-        if (this.mode == SGNode.PICK)
+        if (this.mode == SGNode.CALLBACK)
         {
-            var projectionM = rs.transformstack[rs.PROJECTION_STACK][0]
-            var modelViewM = rs.transformstack[rs.MODELVIEW_STACK][0]
-            var compositeMatrix = mat4mul(projectionM, modelViewM)
-            bag.push(compositeMatrix)
+            this.onTraverse(rs)
         }
         this.updateChildren(rs)
     }
+
+    this.onTraverse = function(rs) {}
 }
 
-function RenderNode(aVertexPosition)
+function BBoxNode(bag)
+{
+    CallbackNode.call(this)
+
+    this.onTraverse = function(rs)
+    {
+        var projectionM = rs.transformstack[rs.PROJECTION_STACK][0]
+        var modelViewM = rs.transformstack[rs.MODELVIEW_STACK][0]
+        var compositeMatrix = mat4mul(projectionM, modelViewM)
+        bag.push(compositeMatrix)
+    }
+}
+
+function RenderNode(aVertexPosition, aTexCoord)
 {
     SGNode.call(this)
     this.aVertexPosition = aVertexPosition
+    this.aTexCoord = aTexCoord
 
     this.update = function(rs)
     {
@@ -203,6 +217,14 @@ function RenderNode(aVertexPosition)
                 ,  0.5, -0.5,  0.0
                 ]
 
+            var texcoords = 
+                [ 0, 1
+                , 0, 0
+                , 1, 1
+                , 1, 0
+                ]
+
+            // Vertices
             var triangleVertexBuffer = gl.createBuffer()
             gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexBuffer)
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangle), gl.STREAM_DRAW)
@@ -215,7 +237,24 @@ function RenderNode(aVertexPosition)
                 0,          // Stride
                 0)          // Buffer offset
 
+
+            // TexCoords
+            var texCoordBuffer = gl.createBuffer()
+            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer)
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texcoords), gl.STREAM_DRAW)
+
+            gl.vertexAttribPointer(
+                this.aTexCoord,
+                2,
+                gl.FLOAT,
+                false,
+                0,
+                0)
+
             gl.enableVertexAttribArray(this.aVertexPosition)
+            gl.enableVertexAttribArray(this.aTexCoord)
+            gl.activeTexture(gl.TEXTURE0)
+
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
             gl.deleteBuffer(triangleVertexBuffer)

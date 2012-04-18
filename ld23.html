@@ -1,20 +1,30 @@
 <html>
     <head>
         <script id="fragmentProgram" type="x-shader/x-fragment">
+            precision mediump float;
+
+            varying vec2 vTexCoord;
+
+            uniform sampler2D uTexture;
+
             void main(void)
             {
-                gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+                gl_FragColor = texture2D(uTexture, vec2(vTexCoord.s, vTexCoord.t));
             }
         </script>
         <script id="vertexProgram" type="x-shader/x-vertex">
             attribute vec3 aVertexPosition;
+            attribute vec2 aTexCoord;
 
             uniform mat4 uModelViewMatrix;
             uniform mat4 uProjectionMatrix;
 
+            varying vec2 vTexCoord;
+
             void main(void)
             {
                 gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aVertexPosition, 1.0);
+                vTexCoord = aTexCoord;
             }
         </script>
         <script type="text/javascript" src="shaders.js"></script>
@@ -61,9 +71,33 @@
                 return m
             }
 
+            function bindTexture(img)
+            {
+                var texture = gl.createTexture()
+                gl.bindTexture(gl.TEXTURE_2D, texture)
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            }
+
+            function loadImage(src, onload)
+            {
+                var img = new Image()
+                img.onload = function() { onload(img) }
+                img.src = src
+            }
+
             function GameState()
             {
                 var aVertexPosition = gl.getAttribLocation(g_shaderprogram, "aVertexPosition")
+                var aTexCoord = gl.getAttribLocation(g_shaderprogram, "aTexCoord")
+                var uTexture = gl.getUniformLocation(g_shaderprogram, "uTexture")
+
+                loadImage("pan.png", function(img)
+                {
+                    bindTexture(img)
+                    gl.uniform1i(uTexture, 0)
+                })
 
                 this.hitboxes = []
 
@@ -82,7 +116,7 @@
                     .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(100)))
                     .attach(new BBoxNode(this.hitboxes))
                     .attach(new ApplyTransform([0, 1]))
-                    .attach(new RenderNode(aVertexPosition))
+                    .attach(new RenderNode(aVertexPosition, aTexCoord))
 
 //                this.gameroot.pan(0.5, 0.0, 0.0)
 
@@ -101,6 +135,9 @@
                 gl.viewport(0, 0, canvas.width, canvas.height)
                 gl.clearColor(0.0, 0.0, 0.0, 1.0)
                 gl.enable(gl.DEPTH_TEST)
+
+                gl.enable(gl.BLEND)
+                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
             }
 
             function checkGLError()
@@ -150,7 +187,7 @@
                 setMessage(x0_screen + " -> " + x0_gl)
 
                 gs.hitboxes.splice(0) // Clear calculated hitbox transforms
-                gs.sgroot.updateWith(SGNode.PICK, renderstate)
+                gs.sgroot.updateWith(SGNode.CALLBACK, renderstate)
 
                 for (var i = 0; i < gs.hitboxes.length; i++)
                 {
