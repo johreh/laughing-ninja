@@ -1,13 +1,26 @@
 function SGNode()
 {
+    SGNode.DRAW = 0
+    SGNode.PICK = 1
+
     this.children = []
     this.parent = null
+    this.mode = SGNode.DRAW
 
     this.attach = function(child)
     {
         this.children.push(child)
         child.parent = this
         return child
+    }
+
+    this.attachP = function(children)
+    {
+        for (var i = 0; i < children.length; i++)
+        {
+            this.attach(children[i])
+        }
+        return this
     }
 
     this.remove = function()
@@ -20,6 +33,12 @@ function SGNode()
         }
     }
 
+    this.updateWith = function(mode, rs)
+    {
+        this.mode = mode
+        this.update(rs)
+    }
+
     this.update = function(rs)
     {
         this.updateChildren(rs)
@@ -29,7 +48,9 @@ function SGNode()
     {
         for (var i = 0; i < this.children.length; i++)
         {
-            this.children[i].update(rs)
+            var child = this.children[i]
+            child.mode = this.mode
+            child.update(rs)
         }
     }
 }
@@ -61,7 +82,7 @@ function MatrixNode(stack, matrix)
 
     this.calculateMatrix = function(rs)
     {
-        return mat4mul(this.matrix, rs.transformstack[this.stack][0])
+        return mat4mul(rs.transformstack[this.stack][0], this.matrix)
     }
 }
 
@@ -139,11 +160,30 @@ function ApplyTransform(stacks)
 
     this.update = function(rs)
     {
-        for (var i = 0; i < this.stacks.length; i++)
+        if (this.mode == SGNode.DRAW)
         {
-            gl.uniformMatrix4fv(rs.matrixUniforms[i], false, rs.transformstack[i][0])
+            for (var i = 0; i < this.stacks.length; i++)
+            {
+                gl.uniformMatrix4fv(rs.matrixUniforms[i], false, rs.transformstack[i][0])
+            }
         }
-        this.updateChildren()
+        this.updateChildren(rs)
+    }
+}
+
+function BBoxNode(bag)
+{
+    SGNode.call(this)
+    this.update = function(rs)
+    {
+        if (this.mode == SGNode.PICK)
+        {
+            var projectionM = rs.transformstack[rs.PROJECTION_STACK][0]
+            var modelViewM = rs.transformstack[rs.MODELVIEW_STACK][0]
+            var compositeMatrix = mat4mul(projectionM, modelViewM)
+            bag.push(compositeMatrix)
+        }
+        this.updateChildren(rs)
     }
 }
 
@@ -154,29 +194,32 @@ function RenderNode(aVertexPosition)
 
     this.update = function(rs)
     {
-        var triangle = 
-            [ -0.5,  0.5,  0.0
-            , -0.5, -0.5,  0.0
-            ,  0.5,  0.5,  0.0
-            ,  0.5, -0.5,  0.0
-            ]
+        if (this.mode == SGNode.DRAW)
+        {
+            var triangle = 
+                [ -0.5,  0.5,  0.0
+                , -0.5, -0.5,  0.0
+                ,  0.5,  0.5,  0.0
+                ,  0.5, -0.5,  0.0
+                ]
 
-        var triangleVertexBuffer = gl.createBuffer()
-        gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexBuffer)
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangle), gl.STREAM_DRAW)
+            var triangleVertexBuffer = gl.createBuffer()
+            gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexBuffer)
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangle), gl.STREAM_DRAW)
 
-        gl.vertexAttribPointer(
-            this.aVertexPosition,     // Attribute
-            3,          // elements/attribute
-            gl.FLOAT,   // element size
-            false,      // Normalize?
-            0,          // Stride
-            0)          // Buffer offset
+            gl.vertexAttribPointer(
+                this.aVertexPosition,     // Attribute
+                3,          // elements/attribute
+                gl.FLOAT,   // element size
+                false,      // Normalize?
+                0,          // Stride
+                0)          // Buffer offset
 
-        gl.enableVertexAttribArray(this.aVertexPosition)
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+            gl.enableVertexAttribArray(this.aVertexPosition)
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
-        gl.deleteBuffer(triangleVertexBuffer)
+            gl.deleteBuffer(triangleVertexBuffer)
+        }
     }
 }
 

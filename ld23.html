@@ -52,18 +52,20 @@
                 var width = viewportdim[2]
                 var height = viewportdim[3]
 
-                var translateM = translationMatrix4(-width, -height, 0)
+                var translateM = translationMatrix4(-width/2, -height/2, 0)
                 var scaleM = identityMatrix4.slice(0)
-                scaleM[at4(0, 0)] = 1 / width
-                scaleM[at4(1, 1)] = -1 / height
+                scaleM[at4(0, 0)] = 2 / width
+                scaleM[at4(1, 1)] = -2 / height
 
-                var m = mat4mul(translateM, scaleM)
+                var m = mat4mul(scaleM, translateM)
                 return m
             }
 
             function GameState()
             {
                 var aVertexPosition = gl.getAttribLocation(g_shaderprogram, "aVertexPosition")
+
+                this.hitboxes = []
 
                 this.sgroot = new SGNode()
                 this.gameroot = new DollyNode(renderstate.PROJECTION_STACK)
@@ -74,13 +76,15 @@
 
                 this.gameroot
                     .attach(new ApplyTransform([0, 1]))
-                    .attach(new RenderNode(aVertexPosition))
+//                    .attach(new RenderNode(aVertexPosition))
                 this.uiroot
+                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(320,240,0)))
                     .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(100)))
+                    .attach(new BBoxNode(this.hitboxes))
                     .attach(new ApplyTransform([0, 1]))
                     .attach(new RenderNode(aVertexPosition))
 
-                this.gameroot.pan(0.5, 0.0, 0.0)
+//                this.gameroot.pan(0.5, 0.0, 0.0)
 
                 this.panning = false
                 this.scanning = false
@@ -135,23 +139,44 @@
                 g_timer = setTimeout(timerProxy, gamesettings.dt)
             }
 
-            function handleinput()
+            function update()
             {
             }
 
-            function update()
+            function pick(x, y)
             {
+                var x0_screen = [x, y, 0]
+                var x0_gl = mat4vec3mul(pixelTransform(), x0_screen)
+                setMessage(x0_screen + " -> " + x0_gl)
+
+                gs.hitboxes.splice(0) // Clear calculated hitbox transforms
+                gs.sgroot.updateWith(SGNode.PICK, renderstate)
+
+                for (var i = 0; i < gs.hitboxes.length; i++)
+                {
+                    var bbox_transform = gs.hitboxes[i]
+                    var bbox_inv = mat4inv(bbox_transform)
+
+                    var x0 = mat4vec3mul(bbox_inv, x0_gl)
+                    var v = vec3sub(mat4vec3mul(bbox_inv, [0, 0, 1]), mat4vec3mul(bbox_inv, [0, 0, 0]))
+                    var hit = closestPointOnLine(x0, v)
+                    if (vec3magnitude(hit) < 1)
+                    {
+                        return true
+                    }
+                }
+                return false
             }
 
             function draw()
             {
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-                gs.sgroot.update(renderstate)
+                gs.sgroot.updateWith(SGNode.DRAW, renderstate)
             }
 
             function init()
             {
-            //    try
+                try
                 {
                     var canvas = document.getElementById("glcanvas")
                     initGL(canvas)
@@ -159,10 +184,10 @@
                     initGame()
                     checkGLError()
                 }
-              /*  catch(e)
+                catch(e)
                 {
                     setMessage("Could not initialize: " + e)
-                }*/
+                }
             }
 
             function onKeyDown(e)
@@ -175,6 +200,9 @@
 
             function onMouseDown(e)
             {
+                var p = findPosition(gl.canvas)
+                var hit = pick(e.x - p[0], e.y - p[1])
+                setMessage(hit ? "Hit!" : "Miss =(")
             }
 
             function onMouseUp(e)
@@ -189,6 +217,21 @@
             {
                 var msgdiv = document.getElementById("msg")
                 msgdiv.innerHTML = msg
+            }
+
+            function findPosition(elem)
+            {
+                var x = 0
+                var y = 0
+                if (elem.offsetParent)
+                {
+                    do
+                    {
+                        x += elem.offsetLeft
+                        y += elem.offsetTop
+                    } while(elem = elem.offsetParent)
+                }
+                return [x, y]
             }
         </script>
     </head>
