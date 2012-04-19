@@ -99,8 +99,11 @@
                     gl.uniform1i(uTexture, 0)
                 })
 
+                // Picking
                 this.hitboxes = []
+                this.pickedtransform = identityMatrix4
 
+                // SceneGraph setup
                 this.sgroot = new SGNode()
                 this.gameroot = new DollyNode(renderstate.PROJECTION_STACK)
                 this.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, pixelTransform())
@@ -109,19 +112,19 @@
                 this.sgroot.attach(this.uiroot)
 
                 this.gameroot
-                    .attach(new ApplyTransform([0, 1]))
-//                    .attach(new RenderNode(aVertexPosition))
-                this.uiroot
-                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(320,240,0)))
-                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(100)))
                     .attach(new BBoxNode(this.hitboxes))
                     .attach(new ApplyTransform([0, 1]))
                     .attach(new RenderNode(aVertexPosition, aTexCoord))
+                this.uiroot
+                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(25,455,0)))
+                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(50)))
+                    .attach(new ApplyTransform([0, 1]))
+                    .attach(new RenderNode(aVertexPosition, aTexCoord))
 
-//                this.gameroot.pan(0.5, 0.0, 0.0)
-
+                // View interaction
                 this.panning = false
                 this.scanning = false
+                this.lastmouse = {"x": 0.0, "y": 0.0}
             }
 
             function initGL(canvas)
@@ -182,9 +185,10 @@
 
             function pick(x, y)
             {
+                var picks = []
+
                 var x0_screen = [x, y, 0]
-                var x0_gl = mat4vec3mul(pixelTransform(), x0_screen)
-                setMessage(x0_screen + " -> " + x0_gl)
+                var x0_gl = mat4hvec3mul(pixelTransform(), x0_screen)
 
                 gs.hitboxes.splice(0) // Clear calculated hitbox transforms
                 gs.sgroot.updateWith(SGNode.CALLBACK, renderstate)
@@ -194,15 +198,15 @@
                     var bbox_transform = gs.hitboxes[i]
                     var bbox_inv = mat4inv(bbox_transform)
 
-                    var x0 = mat4vec3mul(bbox_inv, x0_gl)
-                    var v = vec3sub(mat4vec3mul(bbox_inv, [0, 0, 1]), mat4vec3mul(bbox_inv, [0, 0, 0]))
+                    var x0 = mat4hvec3mul(bbox_inv, x0_gl)
+                    var v = mat4vec3mul(bbox_inv, [0, 0, 1])
                     var hit = closestPointOnLine(x0, v)
                     if (vec3magnitude(hit) < 1)
                     {
-                        return true
+                        picks.push({"transform": bbox_transform})
                     }
                 }
-                return false
+                return picks
             }
 
             function draw()
@@ -237,17 +241,52 @@
 
             function onMouseDown(e)
             {
-                var p = findPosition(gl.canvas)
-                var hit = pick(e.x - p[0], e.y - p[1])
-                setMessage(hit ? "Hit!" : "Miss =(")
+                gs.lastmouse = localMousePosition(e, gl.canvas)
+                var hits = pick(gs.lastmouse.x, gs.lastmouse.y)
+                if (hits.length > 0)
+                {
+                    if (e.button == 2)
+                    {
+                        if (!e.shiftKey)
+                        {
+                            gs.scanning = true
+                        }
+                        else
+                        {
+                            gs.panning = true
+                        }
+                    }
+                    gs.pickedtransform = hits[0]
+                }
             }
 
             function onMouseUp(e)
             {
+                gs.scanning = false
+                gs.panning = false
             }
 
             function onMouseMove(e)
             {
+                var currentmouse = localMousePosition(e, gl.canvas)
+                var v0_screen = 
+                    [ currentmouse.x - gs.lastmouse.x
+                    , currentmouse.y - gs.lastmouse.y
+                    , 0]
+                gs.lastmouse = currentmouse
+
+                if (gs.scanning)
+                {
+                    var view_inv = mat4mul(mat4inv(gs.pickedtransform.transform), pixelTransform())
+                    var v0_inv = mat4vec3mul(view_inv, v0_screen)
+                    gs.gameroot.scan(v0_inv[0], v0_inv[1], 0)
+                }
+                else if (gs.panning)
+                {
+                    var v0_gl = mat4vec3mul(pixelTransform(), v0_screen)
+                    var v0_rads = vec3scale(v0_gl, Math.PI)
+                    gs.gameroot.pan(v0_rads[0], -v0_rads[1])
+                }
             }
 
             function setMessage(msg)
@@ -256,6 +295,9 @@
                 msgdiv.innerHTML = msg
             }
 
+            /*
+             * Find position of a HTML element
+             */
             function findPosition(elem)
             {
                 var x = 0
@@ -268,7 +310,16 @@
                         y += elem.offsetTop
                     } while(elem = elem.offsetParent)
                 }
-                return [x, y]
+                return {"x": x, "y": y}
+            }
+
+            /*
+             * Find coordinates of mouse relative to HTML element
+             */
+            function localMousePosition(e, elem)
+            {
+                var p = findPosition(elem)
+                return {"x": e.x - p.x, "y": e.y - p.y}
             }
         </script>
     </head>
@@ -278,7 +329,8 @@
                 onkeyup="onKeyUp(event)"
                 onmousedown="onMouseDown(event)"
                 onmouseup="onMouseUp(event)"
-                onmousemove="onMouseMove(event)">
+                onmousemove="onMouseMove(event)"
+                oncontextmenu="return false">
             Looks like there's no support for HTML5 Canvas =(
         </canvas>
         <div id="msg">

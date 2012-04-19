@@ -55,6 +55,22 @@ function translationMatrix4(x, y, z)
     return m
 }
 
+/*
+ * Multiplicate 4x4 matrix with homogeneous 3 element vector (4:th vector element 1)
+ */
+function mat4hvec3mul(m, v)
+{
+    var w = mat4vec3mul(m, v)
+    for (var i = 0; i < 3; i++)
+    {
+        w[i] += m[at4(i, 3)]
+    }
+    return w
+}
+
+/*
+ * Multiplicate 4x4 matrix with 3 element vector (assume vector 4:th element 0)
+ */
 function mat4vec3mul(m, v)
 {
     var w = [0, 0, 0]
@@ -64,7 +80,6 @@ function mat4vec3mul(m, v)
         {
             w[i] += m[at4(i, j)] * v[j]
         }
-        w[i] += m[at4(i, 3)]
     }
     return w
 }

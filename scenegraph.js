@@ -111,20 +111,20 @@ function DollyNode(stack)
 //        var zoomM = scaleMatrix4(this.d)
         var translateM = translationMatrix4(this.x, this.y, this.z)
 
-        var yawM = identityMatrix4.slice(0)
+        var yawM = identityMatrix4.slice(0)         // Rotate around z-axis
         yawM[at4(0, 0)] = Math.cos(this.yaw)
         yawM[at4(2, 0)] = Math.sin(this.yaw)
         yawM[at4(0, 2)] = -Math.sin(this.yaw)
         yawM[at4(2, 2)] = Math.cos(this.yaw)
 
-        var pitchM = identityMatrix4.slice(0)
+        var pitchM = identityMatrix4.slice(0)       // Rotate around x-axis
         pitchM[at4(1, 1)] = Math.cos(this.pitch)
         pitchM[at4(2, 1)] = -Math.sin(this.pitch)
         pitchM[at4(1, 2)] = Math.sin(this.pitch)
         pitchM[at4(2, 2)] = Math.cos(this.pitch)
 
-        var dM = identityMatrix4.slice(0)
-        dM[at4(2, 2)] = this.d
+        var dM = identityMatrix4.slice(0)           // Slide along y-axis
+        dM[at4(2, 3)] = this.d
         
         var m = mat4mul(translateM, rs.transformstack[this.stack][0])
         m = mat4mul(yawM, m)
@@ -134,14 +134,14 @@ function DollyNode(stack)
         return m
     }
 
-    this.pan = function(dx, dy, dz)
+    this.scan = function(dx, dy, dz)
     {
         this.x += dx
         this.y += dy
         this.z += dz
     }
 
-    this.scan = function(yaw, pitch)
+    this.pan = function(yaw, pitch)
     {
         this.yaw += yaw
         this.pitch += pitch
@@ -190,13 +190,14 @@ function CallbackNode()
 function BBoxNode(bag)
 {
     CallbackNode.call(this)
+    this.bag = bag
 
     this.onTraverse = function(rs)
     {
         var projectionM = rs.transformstack[rs.PROJECTION_STACK][0]
         var modelViewM = rs.transformstack[rs.MODELVIEW_STACK][0]
         var compositeMatrix = mat4mul(projectionM, modelViewM)
-        bag.push(compositeMatrix)
+        this.bag.push(compositeMatrix)
     }
 }
 
