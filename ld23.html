@@ -41,49 +41,67 @@
                 }
 
             var imagelist = 
-                [   { "identifier": "pan"
-                    , "url":        "pan.png"
-                    }
-                ,   { "identifier": "fox"
-                    , "url":        "cubetexture.png"
-                    } 
-                ]
+                { "pan": "pan.png"
+                , "fox": "cubetexture.png"
+                }
+
+            var meshlist = 
+                { "quad": 
+                    [ -0.5,  0.5,  0.0, 0, 1
+                    , -0.5, -0.5,  0.0, 0, 0
+                    ,  0.5,  0.5,  0.0, 1, 1
+                    ,  0.5, -0.5,  0.0, 1, 0
+                    ]
+                }
 
             var renderstate
             var gs
             var resources = new Resources()
-            var gfxstore
 
-            function RenderState(matrixUniforms, aVertexPosition, aTexCoord, uTexture)
+            function RenderState(gfxstore, matrixUniforms, aVertexPosition, aTexCoord, uTexture)
             {
                 this.PROJECTION_STACK = 0
                 this.MODELVIEW_STACK = 1
 
+                this.gfxstore = gfxstore
+
                 this.matrixUniforms = matrixUniforms
-                this.transformstack = []
+                this.aVertexPosition = aVertexPosition
+                this.aTexCoord = aTexCoord
+                this.uTexture = uTexture
 
-                for (var i = 0; i < matrixUniforms.length; i++)
+                this.transformstack = matrixUniforms.map(function(){return [identityMatrix4.slice(0)]})
+
+
+                this.render = function(mesh, primitive, texture)
                 {
-                    this.transformstack.push([identityMatrix4.slice(0)])
-                }
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this.gfxstore.buffers.getResource(mesh))
 
-                this.render = function(mesh)
-                {
-                }
-            }
+                    gl.vertexAttribPointer(
+                        this.aVertexPosition,     // Attribute
+                        3,          // elements/attribute
+                        gl.FLOAT,   // element size
+                        false,      // Normalize?
+                        4*5,          // Stride
+                        0)          // Buffer offset
 
-            function quadMesh()
-            {
-                return 
-                    [   { "vertices":
-                            [ -1,  1,  0, 0, 1
-                            , -1, -1,  0, 0, 0
-                            ,  1,  1,  0, 1, 1
-                            ,  1, -1,  0, 1, 0
-                            ]
-                        , "primitive": gl.TRIANGLESTRIP
-                        }
-                    ]
+                    gl.vertexAttribPointer(
+                        this.aTexCoord,
+                        2,
+                        gl.FLOAT,
+                        false,
+                        4*5,
+                        4*3)
+
+                    gl.enableVertexAttribArray(this.aVertexPosition)
+                    gl.enableVertexAttribArray(this.aTexCoord)
+
+                    gl.activeTexture(gl.TEXTURE0)
+                    gl.bindTexture(gl.TEXTURE_2D, this.gfxstore.textures.getResource(texture))
+                    gl.uniform1i(uTexture, 0)
+
+                    gl.drawArrays(primitive, 0, 4)
+                }
             }
 
             function pixelTransform()
@@ -122,12 +140,12 @@
                 this.gameroot
                     .attach(new BBoxNode(this.hitboxes))
                     .attach(new ApplyTransform([0, 1]))
-                    .attach(new RenderNode(aVertexPosition, aTexCoord, "pan"))
+                    .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
                 this.uiroot
                     .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(25,455,0)))
                     .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(50)))
                     .attach(new ApplyTransform([0, 1]))
-                    .attach(new RenderNode(aVertexPosition, aTexCoord, "pan"))
+                    .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "pan"))
 
                 // View interaction
                 this.panning = false
@@ -169,10 +187,10 @@
                 gl.useProgram(g_shaderprogram)
             }
 
-            function initResources()
+            function initResourcesThenGame()
             {
                 resources.loadfinished = initGame
-                resources.load(imagelist, [])
+                resources.load(imagelist, meshlist)
             }
 
             function initGame()
@@ -180,13 +198,15 @@
                 var uModelViewMatrix = gl.getUniformLocation(g_shaderprogram, "uModelViewMatrix")
                 var uProjectionMatrix = gl.getUniformLocation(g_shaderprogram, "uProjectionMatrix")
                 var uTexture = gl.getUniformLocation(g_shaderprogram, "uTexture")
+                var aVertexPosition = gl.getAttribLocation(g_shaderprogram, "aVertexPosition")
+                var aTexCoord = gl.getAttribLocation(g_shaderprogram, "aTexCoord")
 
-                gfxstore = new GfxStore(gl, resources, 2, 2)
-
-                gl.bindTexture(gl.TEXTURE_2D, gfxstore.textures.getResource("pan"))
-                gl.uniform1i(uTexture, 0)
-
-                renderstate = new RenderState([uProjectionMatrix, uModelViewMatrix])
+                renderstate = new RenderState(
+                    new GfxStore(gl, resources, 2, 2),
+                    [uProjectionMatrix, uModelViewMatrix],
+                    aVertexPosition,
+                    aTexCoord,
+                    uTexture)
                 gs = new GameState()
 
                 timerProxy()
@@ -242,7 +262,7 @@
                     var canvas = document.getElementById("glcanvas")
                     initGL(canvas)
                     initShaders()
-                    initResources() // calls initGame()
+                    initResourcesThenGame()
                     checkGLError()
                 }
                 catch(e)

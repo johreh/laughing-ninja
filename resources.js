@@ -7,10 +7,10 @@ function Mesh(vertices, usage, textureidentifier, primitive)
     this.primitive = primitive
 }
 
-function bufferMesh(buffer, mesh, usage)
+function bufferMesh(buffer, mesh)
 {
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh.vertices), mesh.usage)
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh), gl.STATIC_DRAW)
     return buffer
 }
 
@@ -45,10 +45,8 @@ function Resources()
     this.load = function(images, meshes)
     {
         var thisptr = this
-        this.pendingresources = images.length
-        for (var i = 0; i < images.length; i++)
+        for (imgid in images)
         {
-            var imgdesc = images[i]
             var f = function(img)
             {
                 thisptr.pendingresources -= 1
@@ -57,11 +55,12 @@ function Resources()
                     thisptr.loadfinished()
                 }
             }
-            this.resources[imgdesc.identifier] = loadImage(imgdesc.url, f)
+            thisptr.pendingresources += 1
+            this.resources[imgid] = loadImage(images[imgid], f)
         }
-        for (var i = 0; i < meshes.length; i++)
+        for (meshid in meshes)
         {
-            this.resources[meshes[i].identifier] = meshes[i].data
+            this.resources[meshid] = meshes[meshid]
         }
     }
 }

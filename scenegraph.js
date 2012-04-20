@@ -201,65 +201,18 @@ function BBoxNode(bag)
     }
 }
 
-function RenderNode(aVertexPosition, aTexCoord, tex)
+function RenderNode(mesh, primitive, texture)
 {
     SGNode.call(this)
-    this.aVertexPosition = aVertexPosition
-    this.aTexCoord = aTexCoord
-    this.tex = tex
+    this.mesh = mesh
+    this.primitive = primitive
+    this.texture = texture
 
     this.update = function(rs)
     {
         if (this.mode == SGNode.DRAW)
         {
-            var triangle = 
-                [ -0.5,  0.5,  0.0
-                , -0.5, -0.5,  0.0
-                ,  0.5,  0.5,  0.0
-                ,  0.5, -0.5,  0.0
-                ]
-
-            var texcoords = 
-                [ 0, 1
-                , 0, 0
-                , 1, 1
-                , 1, 0
-                ]
-
-            // Vertices
-            var triangleVertexBuffer = gl.createBuffer()
-            gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexBuffer)
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangle), gl.STREAM_DRAW)
-
-            gl.vertexAttribPointer(
-                this.aVertexPosition,     // Attribute
-                3,          // elements/attribute
-                gl.FLOAT,   // element size
-                false,      // Normalize?
-                0,          // Stride
-                0)          // Buffer offset
-
-
-            // TexCoords
-            var texCoordBuffer = gl.createBuffer()
-            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer)
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texcoords), gl.STREAM_DRAW)
-
-            gl.vertexAttribPointer(
-                this.aTexCoord,
-                2,
-                gl.FLOAT,
-                false,
-                0,
-                0)
-
-            gl.enableVertexAttribArray(this.aVertexPosition)
-            gl.enableVertexAttribArray(this.aTexCoord)
-            gl.activeTexture(gl.TEXTURE0)
-
-            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-
-            gl.deleteBuffer(triangleVertexBuffer)
+            rs.render(this.mesh, this.primitive, this.texture)
         }
     }
 }
