@@ -267,7 +267,7 @@
                 }
                 catch(e)
                 {
-                    setMessage("Could not initialize: " + e)
+                    addMessage("Could not initialize: " + e)
                 }
             }
 
@@ -332,10 +332,11 @@
                 }
             }
 
-            function setMessage(msg)
+            function addMessage(msg)
             {
                 var msgdiv = document.getElementById("msg")
-                msgdiv.innerHTML = msg
+                msgdiv.appendChild(document.createTextNode(msg))
+                msgdiv.appendChild(document.createElement("br"))
             }
 
             /*
