@@ -27,9 +27,10 @@
                 vTexCoord = aTexCoord;
             }
         </script>
+        <script type="text/javascript" src="linalg.js"></script>
+        <script type="text/javascript" src="resources.js"></script>
         <script type="text/javascript" src="shaders.js"></script>
         <script type="text/javascript" src="scenegraph.js"></script>
-        <script type="text/javascript" src="linalg.js"></script>
         <script type="text/javascript" charset="utf-8">
             var gl
             var g_shaderprogram
@@ -39,10 +40,21 @@
                 { dt: 33
                 }
 
+            var imagelist = 
+                [   { "identifier": "pan"
+                    , "url":        "pan.png"
+                    }
+                ,   { "identifier": "fox"
+                    , "url":        "cubetexture.png"
+                    } 
+                ]
+
             var renderstate
             var gs
+            var resources = new Resources()
+            var gfxstore
 
-            function RenderState(matrixUniforms)
+            function RenderState(matrixUniforms, aVertexPosition, aTexCoord, uTexture)
             {
                 this.PROJECTION_STACK = 0
                 this.MODELVIEW_STACK = 1
@@ -54,6 +66,24 @@
                 {
                     this.transformstack.push([identityMatrix4.slice(0)])
                 }
+
+                this.render = function(mesh)
+                {
+                }
+            }
+
+            function quadMesh()
+            {
+                return 
+                    [   { "vertices":
+                            [ -1,  1,  0, 0, 1
+                            , -1, -1,  0, 0, 0
+                            ,  1,  1,  0, 1, 1
+                            ,  1, -1,  0, 1, 0
+                            ]
+                        , "primitive": gl.TRIANGLESTRIP
+                        }
+                    ]
             }
 
             function pixelTransform()
@@ -71,33 +101,11 @@
                 return m
             }
 
-            function bindTexture(img)
-            {
-                var texture = gl.createTexture()
-                gl.bindTexture(gl.TEXTURE_2D, texture)
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            }
-
-            function loadImage(src, onload)
-            {
-                var img = new Image()
-                img.onload = function() { onload(img) }
-                img.src = src
-            }
 
             function GameState()
             {
                 var aVertexPosition = gl.getAttribLocation(g_shaderprogram, "aVertexPosition")
                 var aTexCoord = gl.getAttribLocation(g_shaderprogram, "aTexCoord")
-                var uTexture = gl.getUniformLocation(g_shaderprogram, "uTexture")
-
-                loadImage("pan.png", function(img)
-                {
-                    bindTexture(img)
-                    gl.uniform1i(uTexture, 0)
-                })
 
                 // Picking
                 this.hitboxes = []
@@ -114,12 +122,12 @@
                 this.gameroot
                     .attach(new BBoxNode(this.hitboxes))
                     .attach(new ApplyTransform([0, 1]))
-                    .attach(new RenderNode(aVertexPosition, aTexCoord))
+                    .attach(new RenderNode(aVertexPosition, aTexCoord, "pan"))
                 this.uiroot
                     .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(25,455,0)))
                     .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(50)))
                     .attach(new ApplyTransform([0, 1]))
-                    .attach(new RenderNode(aVertexPosition, aTexCoord))
+                    .attach(new RenderNode(aVertexPosition, aTexCoord, "pan"))
 
                 // View interaction
                 this.panning = false
@@ -161,10 +169,22 @@
                 gl.useProgram(g_shaderprogram)
             }
 
+            function initResources()
+            {
+                resources.loadfinished = initGame
+                resources.load(imagelist, [])
+            }
+
             function initGame()
             {
                 var uModelViewMatrix = gl.getUniformLocation(g_shaderprogram, "uModelViewMatrix")
                 var uProjectionMatrix = gl.getUniformLocation(g_shaderprogram, "uProjectionMatrix")
+                var uTexture = gl.getUniformLocation(g_shaderprogram, "uTexture")
+
+                gfxstore = new GfxStore(gl, resources, 2, 2)
+
+                gl.bindTexture(gl.TEXTURE_2D, gfxstore.textures.getResource("pan"))
+                gl.uniform1i(uTexture, 0)
 
                 renderstate = new RenderState([uProjectionMatrix, uModelViewMatrix])
                 gs = new GameState()
@@ -222,7 +242,7 @@
                     var canvas = document.getElementById("glcanvas")
                     initGL(canvas)
                     initShaders()
-                    initGame()
+                    initResources() // calls initGame()
                     checkGLError()
                 }
                 catch(e)
@@ -268,24 +288,27 @@
 
             function onMouseMove(e)
             {
-                var currentmouse = localMousePosition(e, gl.canvas)
-                var v0_screen = 
-                    [ currentmouse.x - gs.lastmouse.x
-                    , currentmouse.y - gs.lastmouse.y
-                    , 0]
-                gs.lastmouse = currentmouse
+                if (gs.scanning || gs.panning)
+                {
+                    var currentmouse = localMousePosition(e, gl.canvas)
+                    var v0_screen =
+                        [ currentmouse.x - gs.lastmouse.x
+                        , currentmouse.y - gs.lastmouse.y
+                        , 0]
+                    gs.lastmouse = currentmouse
 
-                if (gs.scanning)
-                {
-                    var view_inv = mat4mul(mat4inv(gs.pickedtransform.transform), pixelTransform())
-                    var v0_inv = mat4vec3mul(view_inv, v0_screen)
-                    gs.gameroot.scan(v0_inv[0], v0_inv[1], 0)
-                }
-                else if (gs.panning)
-                {
-                    var v0_gl = mat4vec3mul(pixelTransform(), v0_screen)
-                    var v0_rads = vec3scale(v0_gl, Math.PI)
-                    gs.gameroot.pan(v0_rads[0], -v0_rads[1])
+                    if (gs.scanning)
+                    {
+                        var view_inv = mat4mul(mat4inv(gs.pickedtransform.transform), pixelTransform())
+                        var v0_inv = mat4vec3mul(view_inv, v0_screen)
+                        gs.gameroot.scan(v0_inv[0], v0_inv[1], 0)
+                    }
+                    else if (gs.panning)
+                    {
+                        var v0_gl = mat4vec3mul(pixelTransform(), v0_screen)
+                        var v0_rads = vec3scale(v0_gl, Math.PI)
+                        gs.gameroot.pan(v0_rads[0], -v0_rads[1])
+                    }
                 }
             }
 

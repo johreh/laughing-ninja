@@ -201,11 +201,12 @@ function BBoxNode(bag)
     }
 }
 
-function RenderNode(aVertexPosition, aTexCoord)
+function RenderNode(aVertexPosition, aTexCoord, tex)
 {
     SGNode.call(this)
     this.aVertexPosition = aVertexPosition
     this.aTexCoord = aTexCoord
+    this.tex = tex
 
     this.update = function(rs)
     {
