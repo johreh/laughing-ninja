@@ -47,10 +47,10 @@
 
             var meshlist = 
                 { "quad": 
-                    [ -0.5,  0.5,  0.0, 0, 1
-                    , -0.5, -0.5,  0.0, 0, 0
-                    ,  0.5,  0.5,  0.0, 1, 1
-                    ,  0.5, -0.5,  0.0, 1, 0
+                    [ -1,  1,  0.0, 0, 1
+                    , -1, -1,  0.0, 0, 0
+                    ,  1,  1,  0.0, 1, 1
+                    ,  1, -1,  0.0, 1, 0
                     ]
                 }
 
@@ -123,7 +123,7 @@
             {
                 // Picking
                 this.hitboxes = []
-                this.pickedtransform = identityMatrix4
+                this.pointofview = identityMatrix4
 
                 // SceneGraph setup
                 this.sgroot = new SGNode()
@@ -194,18 +194,18 @@
                 gs.screentransform = pixelTransform()
 
                 // SceneGraph setup
-                gs.gameroot = new DollyNode(renderstate.PROJECTION_STACK)
-                gs.sgroot.attach(gs.gameroot)
-                gs.gameroot
+                gs.sgroot
+                    .attach(new MatrixNode(renderstate.PROJECTION_STACK, projectionMatrix4(-1, 1, -1, 1, 1, 10)))
+                    .attach(gs.gameroot = new DollyNode(renderstate.PROJECTION_STACK))
+                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(0,0,-3)))
                     .attach(new BBoxNode(gs.hitboxes, 1))
                     .attach(new ApplyTransform([0, 1]))
                     .attach(gs.gadget = new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
 
-                gs.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, gs.screentransform)
-                gs.sgroot.attach(gs.uiroot)
-                gs.uiroot
+                gs.sgroot
+                    .attach(gs.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, gs.screentransform))
                     .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(25,455,0)))
-                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(50)))
+                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(25)))
                     .attach(new BBoxNode(gs.hitboxes, 2))
                     .attach(new ApplyTransform([0, 1]))
                     .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "pan"))
@@ -243,6 +243,7 @@
                     var x0 = mat4hvec3mul(bbox_inv, x0_gl)
                     var v = mat4vec3mul(bbox_inv, [0, 0, 1])
                     var hit = closestPointOnLine(x0, v)
+                    hit[2] = 0
                     if (vec3magnitude(hit) < 1)
                     {
                         var hitinfo = 

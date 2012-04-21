@@ -37,6 +37,19 @@ function mat4scale(m, scalar)
     return mr
 }
 
+function mat4transpose(m)
+{
+    var r = identityMatrix4.slice(0)
+    for (var i = 0; i < 4; i++)
+    {
+        for (var j = 0; j < 4; j++)
+        {
+            r[at4(i, j)] = m[at4(j, i)]
+        }
+    }
+    return r
+}
+
 function scaleMatrix4(scale)
 {
     var m = identityMatrix4.slice(0)
@@ -53,6 +66,16 @@ function translationMatrix4(x, y, z)
     m[at4(1, 3)] = y
     m[at4(2, 3)] = z
     return m
+}
+
+function projectionMatrix4(l, r, b, t, n, f)
+{
+    // I can't write matrices in column-major order :-P
+    return mat4transpose(
+        [ 2*n/(r-l),    0,          (r+l)/(r-l),    0
+        , 0,            2*n/(t-b),  (t+b)/(t-b),    0
+        , 0,            0,          -(f+n)/(f-n),   -2*f*n/(f-n)
+        , 0,            0,          -1,             0 ])
 }
 
 /*
