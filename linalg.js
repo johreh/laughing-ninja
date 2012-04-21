@@ -167,7 +167,7 @@ function vec3norm(v)
 // Closest point on a line to origin
 function closestPointOnLine(x0, v)
 {
-    var t1 = scalarProd3(x0, v) / scalarProd3(v, v)
+    var t1 = -scalarProd3(x0, v) / scalarProd3(v, v)
     return vec3add(x0, vec3scale(v, t1))
 }
 
