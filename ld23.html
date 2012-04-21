@@ -55,7 +55,7 @@
                 }
 
             var renderstate
-            var gs
+            var gs = new GameState()
             var resources = new Resources()
 
             function RenderState(gfxstore, matrixUniforms, aVertexPosition, aTexCoord, uTexture)
@@ -119,33 +119,14 @@
                 return m
             }
 
-
             function GameState()
             {
-                var aVertexPosition = gl.getAttribLocation(g_shaderprogram, "aVertexPosition")
-                var aTexCoord = gl.getAttribLocation(g_shaderprogram, "aTexCoord")
-
                 // Picking
                 this.hitboxes = []
                 this.pickedtransform = identityMatrix4
 
                 // SceneGraph setup
                 this.sgroot = new SGNode()
-                this.gameroot = new DollyNode(renderstate.PROJECTION_STACK)
-                this.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, pixelTransform())
-
-                this.sgroot.attach(this.gameroot)
-                this.sgroot.attach(this.uiroot)
-
-                this.gameroot
-                    .attach(new BBoxNode(this.hitboxes))
-                    .attach(new ApplyTransform([0, 1]))
-                    .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
-                this.uiroot
-                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(25,455,0)))
-                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(50)))
-                    .attach(new ApplyTransform([0, 1]))
-                    .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "pan"))
 
                 // View interaction
                 this.panning = false
@@ -207,8 +188,25 @@
                     aVertexPosition,
                     aTexCoord,
                     uTexture)
-                gs = new GameState()
 
+                // SceneGraph setup
+                gs.gameroot = new DollyNode(renderstate.PROJECTION_STACK)
+                gs.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, pixelTransform())
+
+                gs.sgroot.attach(gs.gameroot)
+                gs.sgroot.attach(gs.uiroot)
+
+                gs.gameroot
+                    .attach(new BBoxNode(gs.hitboxes))
+                    .attach(new ApplyTransform([0, 1]))
+                    .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
+                gs.uiroot
+                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(25,455,0)))
+                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(50)))
+                    .attach(new ApplyTransform([0, 1]))
+                    .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "pan"))
+
+                // Game Loop
                 timerProxy()
             }
 
