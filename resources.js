@@ -1,12 +1,4 @@
 
-function Mesh(vertices, usage, textureidentifier, primitive)
-{
-    this.vertices = vertices
-    this.usage = usage
-    this.texture = textureidentifier
-    this.primitive = primitive
-}
-
 function bufferMesh(buffer, mesh)
 {
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
