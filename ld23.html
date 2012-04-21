@@ -176,6 +176,7 @@
 
             function initGame()
             {
+                // Render setup
                 var uModelViewMatrix = gl.getUniformLocation(g_shaderprogram, "uModelViewMatrix")
                 var uProjectionMatrix = gl.getUniformLocation(g_shaderprogram, "uProjectionMatrix")
                 var uTexture = gl.getUniformLocation(g_shaderprogram, "uTexture")
@@ -191,18 +192,18 @@
 
                 // SceneGraph setup
                 gs.gameroot = new DollyNode(renderstate.PROJECTION_STACK)
-                gs.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, pixelTransform())
-
                 gs.sgroot.attach(gs.gameroot)
-                gs.sgroot.attach(gs.uiroot)
-
                 gs.gameroot
-                    .attach(new BBoxNode(gs.hitboxes))
+                    .attach(new BBoxNode(gs.hitboxes, 1))
                     .attach(new ApplyTransform([0, 1]))
-                    .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
+                    .attach(gs.gadget = new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
+
+                gs.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, pixelTransform())
+                gs.sgroot.attach(gs.uiroot)
                 gs.uiroot
                     .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(25,455,0)))
                     .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(50)))
+                    .attach(new BBoxNode(gs.hitboxes, 2))
                     .attach(new ApplyTransform([0, 1]))
                     .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "pan"))
 
@@ -233,7 +234,7 @@
 
                 for (var i = 0; i < gs.hitboxes.length; i++)
                 {
-                    var bbox_transform = gs.hitboxes[i]
+                    var bbox_transform = gs.hitboxes[i].transform
                     var bbox_inv = mat4inv(bbox_transform)
 
                     var x0 = mat4hvec3mul(bbox_inv, x0_gl)
@@ -241,7 +242,13 @@
                     var hit = closestPointOnLine(x0, v)
                     if (vec3magnitude(hit) < 1)
                     {
-                        picks.push({"transform": bbox_transform})
+                        var hitinfo = 
+                            { "transform":      bbox_transform
+                            , "inv_transform":  bbox_inv
+                            , "z":              0.0 // Need to calculate depth...
+                            , "hitid":          gs.hitboxes[i].id
+                            }
+                        picks.push(hitinfo)
                     }
                 }
                 return picks
@@ -269,6 +276,9 @@
                 }
             }
 
+            /*
+             * Input handling
+             */
             function onKeyDown(e)
             {
             }
@@ -283,18 +293,27 @@
                 var hits = pick(gs.lastmouse.x, gs.lastmouse.y)
                 if (hits.length > 0)
                 {
-                    if (e.button == 2)
+                    switch(hits[0].hitid)
                     {
-                        if (!e.shiftKey)
-                        {
-                            gs.scanning = true
-                        }
-                        else
-                        {
-                            gs.panning = true
-                        }
+                        case 1:
+                            gs.pointofview = hits[0].transform
+                            if (e.button != 2)
+                            {
+                                gs.scanning = true
+                            }
+                            else
+                            {
+                                gs.panning = true
+                            }
+                            break
+
+                        case 2:
+                            gs.gadget.texture = (e.button == 0) ? "fox" : "pan"
+                            break
+
+                        default:
+                            break
                     }
-                    gs.pickedtransform = hits[0]
                 }
             }
 
@@ -317,7 +336,7 @@
 
                     if (gs.scanning)
                     {
-                        var view_inv = mat4mul(mat4inv(gs.pickedtransform.transform), pixelTransform())
+                        var view_inv = mat4mul(mat4inv(gs.pointofview), pixelTransform())
                         var v0_inv = mat4vec3mul(view_inv, v0_screen)
                         gs.gameroot.scan(v0_inv[0], v0_inv[1], 0)
                     }
@@ -330,6 +349,9 @@
                 }
             }
 
+            /*
+             * Nicer than popups...
+             */
             function addMessage(msg)
             {
                 var msgdiv = document.getElementById("msg")

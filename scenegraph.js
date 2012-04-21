@@ -187,17 +187,18 @@ function CallbackNode()
     this.onTraverse = function(rs) {}
 }
 
-function BBoxNode(bag)
+function BBoxNode(bag, hitid)
 {
     CallbackNode.call(this)
     this.bag = bag
+    this.id = hitid
 
     this.onTraverse = function(rs)
     {
         var projectionM = rs.transformstack[rs.PROJECTION_STACK][0]
         var modelViewM = rs.transformstack[rs.MODELVIEW_STACK][0]
         var compositeMatrix = mat4mul(projectionM, modelViewM)
-        this.bag.push(compositeMatrix)
+        this.bag.push({"transform": compositeMatrix, "id": this.id})
     }
 }
 
