@@ -190,6 +190,9 @@
                     aTexCoord,
                     uTexture)
 
+                // Transform screen pixel-coordinates -> normalized WebGL coordinates
+                gs.screentransform = pixelTransform()
+
                 // SceneGraph setup
                 gs.gameroot = new DollyNode(renderstate.PROJECTION_STACK)
                 gs.sgroot.attach(gs.gameroot)
@@ -198,7 +201,7 @@
                     .attach(new ApplyTransform([0, 1]))
                     .attach(gs.gadget = new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
 
-                gs.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, pixelTransform())
+                gs.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, gs.screentransform)
                 gs.sgroot.attach(gs.uiroot)
                 gs.uiroot
                     .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(25,455,0)))
@@ -227,7 +230,7 @@
                 var picks = []
 
                 var x0_screen = [x, y, 0]
-                var x0_gl = mat4hvec3mul(pixelTransform(), x0_screen)
+                var x0_gl = mat4hvec3mul(gs.screentransform, x0_screen)
 
                 gs.hitboxes.splice(0) // Clear calculated hitbox transforms
                 gs.sgroot.updateWith(SGNode.CALLBACK, renderstate)
@@ -336,13 +339,13 @@
 
                     if (gs.scanning)
                     {
-                        var view_inv = mat4mul(mat4inv(gs.pointofview), pixelTransform())
+                        var view_inv = mat4mul(mat4inv(gs.pointofview), gs.screentransform)
                         var v0_inv = mat4vec3mul(view_inv, v0_screen)
                         gs.gameroot.scan(v0_inv[0], v0_inv[1], 0)
                     }
                     else if (gs.panning)
                     {
-                        var v0_gl = mat4vec3mul(pixelTransform(), v0_screen)
+                        var v0_gl = mat4vec3mul(gs.screentransform, v0_screen)
                         var v0_rads = vec3scale(v0_gl, Math.PI)
                         gs.gameroot.pan(v0_rads[0], -v0_rads[1])
                     }
