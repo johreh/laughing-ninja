@@ -126,10 +126,10 @@ function DollyNode(stack)
         var dM = identityMatrix4.slice(0)           // Slide along y-axis
         dM[at4(2, 3)] = this.d
         
-        var m = mat4mul(rs.transformstack[this.stack][0], translateM)
-        m = mat4mul(m, yawM)
+        m = mat4mul(rs.transformstack[this.stack][0], dM)
         m = mat4mul(m, pitchM)
-        m = mat4mul(m, dM)
+        m = mat4mul(m, yawM)
+        m = mat4mul(m, translateM)
 
         return m
     }
@@ -162,10 +162,7 @@ function ApplyTransform(stacks)
     {
         if (this.mode == SGNode.DRAW)
         {
-            for (var i = 0; i < this.stacks.length; i++)
-            {
-                gl.uniformMatrix4fv(rs.matrixUniforms[i], false, rs.transformstack[i][0])
-            }
+            rs.applyTransform(this.stacks)
         }
         this.updateChildren(rs)
     }
