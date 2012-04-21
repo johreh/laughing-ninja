@@ -31,6 +31,7 @@
         <script type="text/javascript" src="resources.js"></script>
         <script type="text/javascript" src="shaders.js"></script>
         <script type="text/javascript" src="scenegraph.js"></script>
+        <script type="text/javascript" src="render.js"></script>
         <script type="text/javascript" charset="utf-8">
             var gl
             var g_shaderprogram
@@ -46,63 +47,66 @@
                 }
 
             var meshlist = 
-                { "quad": 
-                    [ -1,  1,  0.0, 0, 1
-                    , -1, -1,  0.0, 0, 0
-                    ,  1,  1,  0.0, 1, 1
-                    ,  1, -1,  0.0, 1, 0
-                    ]
+                { "quad": new Float32Array(
+                    [ -1,  1, 0, 0, 1
+                    , -1, -1, 0, 0, 0
+                    ,  1,  1, 0, 1, 1
+                    ,  1, -1, 0, 1, 0
+                    ])
+                , "triangle": new Float32Array(
+                    [  0.0,  1.0,  0.0, 0.5, 1
+                    , -1.0, -1.0,  0.0, 0,   0
+                    ,  1.0, -1.0,  0.0, 1,   0
+                    ])
+                , "cubevertices": new Float32Array(
+                    [ -1.0, -1.0,  1.0, 0, 0
+                    ,  1.0, -1.0,  1.0, 1, 0
+                    ,  1.0,  1.0,  1.0, 1, 1
+                    , -1.0,  1.0,  1.0, 0, 1
+
+                      // Back face
+                    , -1.0, -1.0, -1.0, 1, 0
+                    , -1.0,  1.0, -1.0, 1, 1
+                    ,  1.0,  1.0, -1.0, 0, 1
+                    ,  1.0, -1.0, -1.0, 0, 0
+
+                      // Top face
+                    , -1.0,  1.0, -1.0, 0, 1
+                    , -1.0,  1.0,  1.0, 0, 0
+                    ,  1.0,  1.0,  1.0, 1, 0
+                    ,  1.0,  1.0, -1.0, 1, 1
+
+                      // Bottom face
+                    , -1.0, -1.0, -1.0, 1, 1
+                    ,  1.0, -1.0, -1.0, 0, 1
+                    ,  1.0, -1.0,  1.0, 0, 0
+                    , -1.0, -1.0,  1.0, 1, 0
+
+                      // Right face
+                    ,  1.0, -1.0, -1.0, 1, 0
+                    ,  1.0,  1.0, -1.0, 1, 1
+                    ,  1.0,  1.0,  1.0, 0, 1
+                    ,  1.0, -1.0,  1.0, 0, 0
+
+                      // Left face
+                    , -1.0, -1.0, -1.0, 0, 0
+                    , -1.0, -1.0,  1.0, 1, 0
+                    , -1.0,  1.0,  1.0, 1, 1
+                    , -1.0,  1.0, -1.0, 0, 1
+                    ])
+                , "cubeindices": new Uint8Array(
+                    [ 0, 1, 2,      0, 2, 3     // Front face
+                    , 4, 5, 6,      4, 6, 7     // Back face
+                    , 8, 9, 10,     8, 10, 11   // Top face
+                    , 12, 13, 14,   12, 14, 15  // Bottom face
+                    , 16, 17, 18,   16, 18, 19  // Right face
+                    , 20, 21, 22,   20, 22, 23  // Left face
+                    ])
                 }
 
             var renderstate
             var gs = new GameState()
             var resources = new Resources()
-
-            function RenderState(gfxstore, matrixUniforms, aVertexPosition, aTexCoord, uTexture)
-            {
-                this.PROJECTION_STACK = 0
-                this.MODELVIEW_STACK = 1
-
-                this.gfxstore = gfxstore
-
-                this.matrixUniforms = matrixUniforms
-                this.aVertexPosition = aVertexPosition
-                this.aTexCoord = aTexCoord
-                this.uTexture = uTexture
-
-                this.transformstack = matrixUniforms.map(function(){return [identityMatrix4.slice(0)]})
-
-
-                this.render = function(mesh, primitive, texture)
-                {
-                    gl.bindBuffer(gl.ARRAY_BUFFER, this.gfxstore.buffers.getResource(mesh))
-
-                    gl.vertexAttribPointer(
-                        this.aVertexPosition,     // Attribute
-                        3,          // elements/attribute
-                        gl.FLOAT,   // element size
-                        false,      // Normalize?
-                        4*5,          // Stride
-                        0)          // Buffer offset
-
-                    gl.vertexAttribPointer(
-                        this.aTexCoord,
-                        2,
-                        gl.FLOAT,
-                        false,
-                        4*5,
-                        4*3)
-
-                    gl.enableVertexAttribArray(this.aVertexPosition)
-                    gl.enableVertexAttribArray(this.aTexCoord)
-
-                    gl.activeTexture(gl.TEXTURE0)
-                    gl.bindTexture(gl.TEXTURE_2D, this.gfxstore.textures.getResource(texture))
-                    gl.uniform1i(uTexture, 0)
-
-                    gl.drawArrays(primitive, 0, 4)
-                }
-            }
 
             function pixelTransform()
             {
@@ -184,6 +188,7 @@
                 var aTexCoord = gl.getAttribLocation(g_shaderprogram, "aTexCoord")
 
                 renderstate = new RenderState(
+                    gl,
                     new GfxStore(gl, resources, 2, 2),
                     [uProjectionMatrix, uModelViewMatrix],
                     aVertexPosition,
@@ -195,12 +200,12 @@
 
                 // SceneGraph setup
                 gs.sgroot
-                    .attach(new MatrixNode(renderstate.PROJECTION_STACK, projectionMatrix4(-1, 1, -1, 1, 1, 10)))
+                    .attach(new MatrixNode(renderstate.PROJECTION_STACK, projectionMatrix4(4/3*2, 2, -2, 2, 2)))
                     .attach(gs.gameroot = new DollyNode(renderstate.PROJECTION_STACK))
-                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(0,0,-3)))
+                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(0.5)))
                     .attach(new BBoxNode(gs.hitboxes, 1))
                     .attach(new ApplyTransform([0, 1]))
-                    .attach(gs.gadget = new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
+                    .attach(gs.gadget = new IndexedRenderNode("cubevertices", gl.TRIANGLES, "fox", "cubeindices", gl.UNSIGNED_BYTE))
 
                 gs.sgroot
                     .attach(gs.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, gs.screentransform))

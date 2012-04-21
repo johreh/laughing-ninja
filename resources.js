@@ -1,8 +1,8 @@
 
-function bufferMesh(buffer, mesh)
+function bufferMesh(buffer, mesh, buffertype, usage)
 {
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh), gl.STATIC_DRAW)
+    gl.bindBuffer(buffertype, buffer)
+    gl.bufferData(buffertype, mesh, usage)
     return buffer
 }
 
@@ -125,7 +125,14 @@ function GfxStore(gl, resourcestore, maxbuffers, maxtextures)
         resourcestore,
         maxbuffers,
         function(){ return gl.createBuffer() },
-        bufferMesh,
+        function(buffer, mesh){ bufferMesh(buffer, mesh, gl.ARRAY_BUFFER, gl.STATIC_DRAW) },
+        function(handle){ gl.deleteBuffer(handle) })
+
+    this.elementbuffers = new ResourceStack(
+        resourcestore,
+        maxbuffers,
+        function(){ return gl.createBuffer() },
+        function(buffer, mesh){ bufferMesh(buffer, mesh, gl.ELEMENT_ARRAY_BUFFER, gl.STATIC_DRAW) },
         function(handle){ gl.deleteBuffer(handle) })
 
     this.flush = function()

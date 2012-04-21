@@ -126,10 +126,10 @@ function DollyNode(stack)
         var dM = identityMatrix4.slice(0)           // Slide along y-axis
         dM[at4(2, 3)] = this.d
         
-        var m = mat4mul(translateM, rs.transformstack[this.stack][0])
-        m = mat4mul(yawM, m)
-        m = mat4mul(pitchM, m)
-        m = mat4mul(dM, m)
+        var m = mat4mul(rs.transformstack[this.stack][0], translateM)
+        m = mat4mul(m, yawM)
+        m = mat4mul(m, pitchM)
+        m = mat4mul(m, dM)
 
         return m
     }
@@ -214,6 +214,24 @@ function RenderNode(mesh, primitive, texture)
         if (this.mode == SGNode.DRAW)
         {
             rs.render(this.mesh, this.primitive, this.texture)
+        }
+    }
+}
+
+function IndexedRenderNode(vertices, primitive, texture, indices, indextype)
+{
+    SGNode.call(this)
+    this.vertices = vertices
+    this.primitive = primitive
+    this.texture = texture
+    this.indices = indices
+    this.indextype = indextype
+
+    this.update = function(rs)
+    {
+        if (this.mode == SGNode.DRAW)
+        {
+            rs.renderIndexed(this.vertices, this.primitive, this.texture, this.indices, this.indextype)
         }
     }
 }

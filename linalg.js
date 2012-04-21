@@ -68,14 +68,26 @@ function translationMatrix4(x, y, z)
     return m
 }
 
-function projectionMatrix4(l, r, b, t, n, f)
+/*
+function projectionMatrix4(l,r,b,t,n,f)
 {
-    // I can't write matrices in column-major order :-P
     return mat4transpose(
         [ 2*n/(r-l),    0,          (r+l)/(r-l),    0
         , 0,            2*n/(t-b),  (t+b)/(t-b),    0
         , 0,            0,          -(f+n)/(f-n),   -2*f*n/(f-n)
         , 0,            0,          -1,             0 ])
+}
+*/
+
+function projectionMatrix4(width, height, near, far, p)
+{
+    // I can't write matrices in column-major order :-P
+    return mat4transpose(
+        [ 2/width,  0,          0,                      0
+        , 0,        2/height,   0,                      0
+        , 0,        0,          2/(far-near),           0.5 - far/(far-near)
+        , 0,        0,          (p - 1)/(far-near),     1 - near*(p-1)/(far-near)
+        ])
 }
 
 /*
