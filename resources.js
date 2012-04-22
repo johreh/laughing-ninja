@@ -1,8 +1,8 @@
 
-function bufferMesh(buffer, mesh, buffertype, usage)
+function bufferArray(buffer, array, buffertype, usage)
 {
     gl.bindBuffer(buffertype, buffer)
-    gl.bufferData(buffertype, mesh, usage)
+    gl.bufferData(buffertype, array, usage)
     return buffer
 }
 
@@ -10,8 +10,8 @@ function bufferTexture(texture, img)
 {
     gl.bindTexture(gl.TEXTURE_2D, texture)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     return texture
 }
 
@@ -112,7 +112,7 @@ function ResourceStack(resourcestore, maxresources, fcreate, fbuffer, fdelete)
     }
 }
 
-function GfxStore(gl, resourcestore, maxbuffers, maxtextures)
+function GfxStore(gl, resourcestore, maxarrays, maxtextures, maxindices)
 {
     this.textures = new ResourceStack(
         resourcestore, 
@@ -121,24 +121,25 @@ function GfxStore(gl, resourcestore, maxbuffers, maxtextures)
         bufferTexture,
         function(handle){ gl.deleteTexture(handle) })
 
-    this.buffers = new ResourceStack(
+    this.arrays = new ResourceStack(
         resourcestore,
-        maxbuffers,
+        maxarrays,
         function(){ return gl.createBuffer() },
-        function(buffer, mesh){ bufferMesh(buffer, mesh, gl.ARRAY_BUFFER, gl.STATIC_DRAW) },
+        function(buffer, mesh){ bufferArray(buffer, mesh, gl.ARRAY_BUFFER, gl.STATIC_DRAW) },
         function(handle){ gl.deleteBuffer(handle) })
 
-    this.elementbuffers = new ResourceStack(
+    this.elementarrays = new ResourceStack(
         resourcestore,
-        maxbuffers,
+        maxindices,
         function(){ return gl.createBuffer() },
-        function(buffer, mesh){ bufferMesh(buffer, mesh, gl.ELEMENT_ARRAY_BUFFER, gl.STATIC_DRAW) },
+        function(buffer, mesh){ bufferArray(buffer, mesh, gl.ELEMENT_ARRAY_BUFFER, gl.STATIC_DRAW) },
         function(handle){ gl.deleteBuffer(handle) })
 
     this.flush = function()
     {
         this.textures.flush()
-        this.buffers.flush()
+        this.arrays.flush()
+        this.elementarrays.flush()
     }
 }
 

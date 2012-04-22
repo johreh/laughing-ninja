@@ -85,8 +85,8 @@ function projectionMatrix4(width, height, near, far, p)
     return mat4transpose(
         [ 2/width,  0,          0,                      0
         , 0,        2/height,   0,                      0
-        , 0,        0,          2/(far-near),           0.5 - far/(far-near)
-        , 0,        0,          (p - 1)/(far-near),     1 - near*(p-1)/(far-near)
+        , 0,        0,          -2/(near-far),          1+(2*far)/(near-far)
+        , 0,        0,          (p - 1)/(far-near),     (far-(near*p))/(far-near)
         ])
 }
 
@@ -167,8 +167,15 @@ function vec3norm(v)
 // Closest point on a line to origin
 function closestPointOnLine(x0, v)
 {
-    var t1 = -scalarProd3(x0, v) / scalarProd3(v, v)
-    return vec3add(x0, vec3scale(v, t1))
+    var t = -scalarProd3(x0, v) / scalarProd3(v, v)
+    return vec3add(x0, vec3scale(v, t))
+}
+
+// Point of intersection on plane N=(0,1,0) and d=0
+function linePlaneIntersection(x0, v)
+{
+    var t = -x0[1] / v[1]
+    return vec3add(x0, vec3scale(v, t))
 }
 
 function at4(row, col)

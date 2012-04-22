@@ -43,6 +43,7 @@
 
             var imagelist = 
                 { "pan": "pan.png"
+                , "grass": "grass.png"
                 , "fox": "cubetexture.png"
                 }
 
@@ -108,16 +109,27 @@
             var gs = new GameState()
             var resources = new Resources()
 
-            function pixelTransform()
+            function viewportDimensions()
             {
                 var viewportdim = gl.getParameter(gl.VIEWPORT)
                 var width = viewportdim[2]
                 var height = viewportdim[3]
+                return {"width": width, "height": height}
+            }
 
-                var translateM = translationMatrix4(-width/2, -height/2, 0)
+            function aspectRatio()
+            {
+                var dim = viewportDimensions()
+                return dim.width/dim.height
+            }
+
+            function pixelTransform()
+            {
+                var dim = viewportDimensions()
+                var translateM = translationMatrix4(-dim.width/2, -dim.height/2, 0)
                 var scaleM = identityMatrix4.slice(0)
-                scaleM[at4(0, 0)] = 2 / width
-                scaleM[at4(1, 1)] = -2 / height
+                scaleM[at4(0, 0)] = 2 / dim.width
+                scaleM[at4(1, 1)] = -2 / dim.height
 
                 var m = mat4mul(scaleM, translateM)
                 return m
@@ -189,7 +201,7 @@
 
                 renderstate = new RenderState(
                     gl,
-                    new GfxStore(gl, resources, 2, 2),
+                    new GfxStore(gl, resources, 2, 2, 2),
                     [uProjectionMatrix, uModelViewMatrix],
                     aVertexPosition,
                     aTexCoord,
@@ -200,12 +212,11 @@
 
                 // SceneGraph setup
                 gs.sgroot
-                    .attach(new MatrixNode(renderstate.PROJECTION_STACK, projectionMatrix4(4/3*2, 2, -2, 2, 2)))
+                    .attach(new MatrixNode(renderstate.PROJECTION_STACK, projectionMatrix4(4*aspectRatio(), 4, -2, 2, 2)))
                     .attach(gs.gameroot = new DollyNode(renderstate.PROJECTION_STACK))
-                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(0.5)))
                     .attach(new BBoxNode(gs.hitboxes, 1))
                     .attach(new ApplyTransform([0, 1]))
-                    .attach(gs.gadget = new IndexedRenderNode("cubevertices", gl.TRIANGLES, "fox", "cubeindices", gl.UNSIGNED_BYTE))
+                    .attach(gs.gadget = new IndexedRenderNode("cubevertices", gl.TRIANGLES, "grass", "cubeindices", gl.UNSIGNED_BYTE))
 
                 gs.sgroot
                     .attach(gs.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, gs.screentransform))
@@ -214,6 +225,9 @@
                     .attach(new BBoxNode(gs.hitboxes, 2))
                     .attach(new ApplyTransform([0, 1]))
                     .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "pan"))
+
+                gs.gameroot.pitch = Math.PI/4
+                gs.gameroot.yaw = Math.PI/4
 
                 // Game Loop
                 timerProxy()
@@ -248,7 +262,6 @@
                     var x0 = mat4hvec3mul(bbox_inv, x0_gl)
                     var v = mat4vec3mul(bbox_inv, [0, 0, 1])
                     var hit = closestPointOnLine(x0, v)
-                    hit[2] = 0
                     if (vec3magnitude(hit) < 1)
                     {
                         var hitinfo = 
@@ -332,25 +345,48 @@
                 gs.panning = false
             }
 
+            /*
+             * (0, 0, 1) vector at position v_gl with compensation for perspective
+             * component w
+             */
+            function zVectorAt(viewmatrix, v_gl)
+            {
+                var w = viewmatrix[15]
+                var v = [v_gl[0]*w - v_gl[0], v_gl[1]*w  - v_gl[1], 1]
+                return v
+            }
+
             function onMouseMove(e)
             {
                 if (gs.scanning || gs.panning)
                 {
                     var currentmouse = localMousePosition(e, gl.canvas)
-                    var v0_screen =
-                        [ currentmouse.x - gs.lastmouse.x
-                        , currentmouse.y - gs.lastmouse.y
-                        , 0]
+                    var x0_screen = [gs.lastmouse.x, gs.lastmouse.y, -1]
+                    var x1_screen = [currentmouse.x, currentmouse.y, -1]
                     gs.lastmouse = currentmouse
 
                     if (gs.scanning)
                     {
-                        var view_inv = mat4mul(mat4inv(gs.pointofview), gs.screentransform)
-                        var v0_inv = mat4vec3mul(view_inv, v0_screen)
-                        gs.gameroot.scan(v0_inv[0], v0_inv[1], 0)
+                        var view_inv = mat4inv(gs.pointofview)
+
+                        var x0_gl = mat4hvec3mul(gs.screentransform, x0_screen)
+                        var x0_inv = mat4hvec3mul(view_inv, x0_gl)
+                        var v0 = zVectorAt(gs.pointofview, x0_gl)
+                        var v0_inv = mat4vec3mul(view_inv, v0)
+
+                        var x1_gl = mat4hvec3mul(gs.screentransform, x1_screen)
+                        var x1_inv = mat4hvec3mul(view_inv, x1_gl)
+                        var v1 = zVectorAt(gs.pointofview, x1_gl)
+                        var v1_inv = mat4vec3mul(view_inv, v1)
+
+                        var x0_world = linePlaneIntersection(x0_inv, v0_inv)
+                        var x1_world = linePlaneIntersection(x1_inv, v1_inv)
+                        var v = vec3sub(x1_world, x0_world)
+                        gs.gameroot.scan(v[0], v[1], v[2])
                     }
                     else if (gs.panning)
                     {
+                        var v0_screen = vec3sub(x1_screen, x0_screen)
                         var v0_gl = mat4vec3mul(gs.screentransform, v0_screen)
                         var v0_rads = vec3scale(v0_gl, Math.PI)
                         gs.gameroot.pan(v0_rads[0], -v0_rads[1])

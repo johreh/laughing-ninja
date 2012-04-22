@@ -14,7 +14,7 @@ function RenderState(gl, gfxstore, matrixUniforms, aVertexPosition, aTexCoord, u
 
     this.setVertexBuffer = function(mesh)
     {
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.gfxstore.buffers.getResource(mesh))
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.gfxstore.arrays.getResource(mesh))
 
         gl.vertexAttribPointer(
             this.aVertexPosition,     // Attribute
@@ -43,6 +43,18 @@ function RenderState(gl, gfxstore, matrixUniforms, aVertexPosition, aTexCoord, u
         gl.uniform1i(uTexture, 0)
     }
 
+    this.applyTransform = function(stacks)
+    {
+        for (var i = 0; i < stacks.length; i++)
+        {
+            var s = stacks[i]
+            gl.uniformMatrix4fv(
+                this.matrixUniforms[s], 
+                false, 
+                this.transformstack[s][0])
+        }
+    }
+
     this.render = function(mesh, primitive, texture)
     {
         var numvertices = resources.resources[mesh].length / 5
@@ -59,8 +71,25 @@ function RenderState(gl, gfxstore, matrixUniforms, aVertexPosition, aTexCoord, u
         this.setVertexBuffer(vertices)
         this.setTexture(texture)
 
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.gfxstore.elementbuffers.getResource(indices))
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.gfxstore.elementarrays.getResource(indices))
         gl.drawElements(primitive, numindices, indextype, 0)
+    }
+
+    this.renderLine = function(x0, x1)
+    {
+        var b = gl.createBuffer()
+        bufferArray(b, new Float32Array(x0.concat(x1)), gl.ARRAY_BUFFER, gl.STREAM_DRAW)
+        gl.vertexAttribPointer(
+            this.aVertexPosition,     // Attribute
+            3,          // elements/attribute
+            gl.FLOAT,   // element size
+            false,      // Normalize?
+            0,          // Stride
+            0)          // Buffer offset
+
+        gl.drawArrays(gl.LINES, 0, 2)
+
+        gl.deleteBuffer(b)
     }
 }
 
