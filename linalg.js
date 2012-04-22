@@ -50,12 +50,12 @@ function mat4transpose(m)
     return r
 }
 
-function scaleMatrix4(scale)
+function scaleMatrix4(x, y, z)
 {
     var m = identityMatrix4.slice(0)
-    m[at4(0, 0)] = scale
-    m[at4(1, 1)] = scale
-    m[at4(2, 2)] = scale
+    m[at4(0, 0)] = x
+    m[at4(1, 1)] = y
+    m[at4(2, 2)] = z
     return m
 }
 
@@ -112,6 +112,19 @@ function mat4vec3mul(m, v)
     for (var i = 0; i < 3; i++)
     {
         for (var j = 0; j < 3; j++)
+        {
+            w[i] += m[at4(i, j)] * v[j]
+        }
+    }
+    return w
+}
+
+function mat4vec4mul(m, v)
+{
+    var w = [0, 0, 0, 0]
+    for (var i = 0; i < 4; i++)
+    {
+        for (var j = 0; j < 4; j++)
         {
             w[i] += m[at4(i, j)] * v[j]
         }
@@ -176,6 +189,16 @@ function linePlaneIntersection(x0, v)
 {
     var t = -x0[1] / v[1]
     return vec3add(x0, vec3scale(v, t))
+}
+
+/*
+ * Return view_inv * (x0_gl + [0, 0, 1]) adjusted for perspective component w
+ */
+function zVectorAt(view_inv, x0_gl)
+{
+    var w = (1 - view_inv[3]*x0_gl[0] + view_inv[7]*x0_gl[1])/view_inv[15]
+    var x1_inv = mat4vec4mul(view_inv, [x0_gl[0]*w,x0_gl[1]*w,0,w]).slice(0, -1)
+    return x1_inv
 }
 
 function at4(row, col)

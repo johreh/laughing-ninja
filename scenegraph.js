@@ -108,7 +108,6 @@ function DollyNode(stack)
 
     this.calculateMatrix = function(rs)
     {
-//        var zoomM = scaleMatrix4(this.d)
         var translateM = translationMatrix4(this.x, this.y, this.z)
 
         var yawM = identityMatrix4.slice(0)         // Rotate around z-axis
@@ -153,6 +152,38 @@ function DollyNode(stack)
     }
 }
 
+function CallbackNode(targetmode)
+{
+    SGNode.call(this)
+    this.targetmode = targetmode
+
+    this.update = function(rs)
+    {
+        if (this.mode == this.targetmode)
+        {
+            this.onTraverse(rs)
+        }
+        this.updateChildren(rs)
+    }
+
+    this.onTraverse = function(rs) {}
+}
+
+function BBoxNode(bag, hitid)
+{
+    CallbackNode.call(this, SGNode.CALLBACK)
+    this.bag = bag
+    this.id = hitid
+
+    this.onTraverse = function(rs)
+    {
+        var projectionM = rs.transformstack[rs.PROJECTION_STACK][0]
+        var modelViewM = rs.transformstack[rs.MODELVIEW_STACK][0]
+        var compositeMatrix = mat4mul(projectionM, modelViewM)
+        this.bag.push({"transform": compositeMatrix, "id": this.id})
+    }
+}
+
 function ApplyTransform(stacks)
 {
     SGNode.call(this)
@@ -165,37 +196,6 @@ function ApplyTransform(stacks)
             rs.applyTransform(this.stacks)
         }
         this.updateChildren(rs)
-    }
-}
-
-function CallbackNode()
-{
-    SGNode.call(this)
-
-    this.update = function(rs)
-    {
-        if (this.mode == SGNode.CALLBACK)
-        {
-            this.onTraverse(rs)
-        }
-        this.updateChildren(rs)
-    }
-
-    this.onTraverse = function(rs) {}
-}
-
-function BBoxNode(bag, hitid)
-{
-    CallbackNode.call(this)
-    this.bag = bag
-    this.id = hitid
-
-    this.onTraverse = function(rs)
-    {
-        var projectionM = rs.transformstack[rs.PROJECTION_STACK][0]
-        var modelViewM = rs.transformstack[rs.MODELVIEW_STACK][0]
-        var compositeMatrix = mat4mul(projectionM, modelViewM)
-        this.bag.push({"transform": compositeMatrix, "id": this.id})
     }
 }
 

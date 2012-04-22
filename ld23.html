@@ -248,8 +248,7 @@
             {
                 var picks = []
 
-                var x0_screen = [x, y, 0]
-                var x0_gl = mat4hvec3mul(gs.screentransform, x0_screen)
+                var x0_gl = mat4hvec3mul(gs.screentransform, [x, y, -1])
 
                 gs.hitboxes.splice(0) // Clear calculated hitbox transforms
                 gs.sgroot.updateWith(SGNode.CALLBACK, renderstate)
@@ -259,9 +258,9 @@
                     var bbox_transform = gs.hitboxes[i].transform
                     var bbox_inv = mat4inv(bbox_transform)
 
-                    var x0 = mat4hvec3mul(bbox_inv, x0_gl)
-                    var v = mat4vec3mul(bbox_inv, [0, 0, 1])
-                    var hit = closestPointOnLine(x0, v)
+                    var x0_inv = mat4hvec3mul(bbox_inv, x0_gl)
+                    var v_inv = vec3sub(zVectorAt(bbox_inv, x0_gl), x0_inv)
+                    var hit = closestPointOnLine(x0_inv, v_inv)
                     if (vec3magnitude(hit) < 1)
                     {
                         var hitinfo = 
@@ -330,7 +329,7 @@
                             break
 
                         case 2:
-                            gs.gadget.texture = (e.button == 0) ? "fox" : "pan"
+                            gs.gadget.texture = (e.button == 0) ? "grass" : "fox"
                             break
 
                         default:
@@ -343,17 +342,6 @@
             {
                 gs.scanning = false
                 gs.panning = false
-            }
-
-            /*
-             * (0, 0, 1) vector at position v_gl with compensation for perspective
-             * component w
-             */
-            function zVectorAt(viewmatrix, v_gl)
-            {
-                var w = viewmatrix[15]
-                var v = [v_gl[0]*w - v_gl[0], v_gl[1]*w  - v_gl[1], 1]
-                return v
             }
 
             function onMouseMove(e)
@@ -371,17 +359,16 @@
 
                         var x0_gl = mat4hvec3mul(gs.screentransform, x0_screen)
                         var x0_inv = mat4hvec3mul(view_inv, x0_gl)
-                        var v0 = zVectorAt(gs.pointofview, x0_gl)
-                        var v0_inv = mat4vec3mul(view_inv, v0)
+                        var v0_inv = vec3sub(zVectorAt(view_inv, x0_gl), x0_inv)
 
                         var x1_gl = mat4hvec3mul(gs.screentransform, x1_screen)
                         var x1_inv = mat4hvec3mul(view_inv, x1_gl)
-                        var v1 = zVectorAt(gs.pointofview, x1_gl)
-                        var v1_inv = mat4vec3mul(view_inv, v1)
+                        var v1_inv = vec3sub(zVectorAt(view_inv, x1_gl), x1_inv)
 
                         var x0_world = linePlaneIntersection(x0_inv, v0_inv)
                         var x1_world = linePlaneIntersection(x1_inv, v1_inv)
                         var v = vec3sub(x1_world, x0_world)
+
                         gs.gameroot.scan(v[0], v[1], v[2])
                     }
                     else if (gs.panning)
@@ -402,6 +389,11 @@
                 var msgdiv = document.getElementById("msg")
                 msgdiv.appendChild(document.createTextNode(msg))
                 msgdiv.appendChild(document.createElement("br"))
+            }
+
+            function clearMessages(msg)
+            {
+                document.getElementById("msg").innerHTML = ""
             }
 
             /*
