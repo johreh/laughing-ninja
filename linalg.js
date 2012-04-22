@@ -68,26 +68,14 @@ function translationMatrix4(x, y, z)
     return m
 }
 
-/*
+
 function projectionMatrix4(l,r,b,t,n,f)
 {
     return mat4transpose(
         [ 2*n/(r-l),    0,          (r+l)/(r-l),    0
         , 0,            2*n/(t-b),  (t+b)/(t-b),    0
         , 0,            0,          -(f+n)/(f-n),   -2*f*n/(f-n)
-        , 0,            0,          -1,             0 ])
-}
-*/
-
-function projectionMatrix4(width, height, near, far, p)
-{
-    // I can't write matrices in column-major order :-P
-    return mat4transpose(
-        [ 2/width,  0,          0,                      0
-        , 0,        2/height,   0,                      0
-        , 0,        0,          -2/(near-far),          1+(2*far)/(near-far)
-        , 0,        0,          (p - 1)/(far-near),     (far-(near*p))/(far-near)
-        ])
+        , 0,            0,          -1,              0 ])
 }
 
 /*
@@ -191,14 +179,10 @@ function linePlaneIntersection(x0, v)
     return vec3add(x0, vec3scale(v, t))
 }
 
-/*
- * Return view_inv * (x0_gl + [0, 0, 1]) adjusted for perspective component w
- */
-function zVectorAt(view_inv, x0_gl)
+function calculateW(m, p)
 {
-    var w = (1 - view_inv[3]*x0_gl[0] + view_inv[7]*x0_gl[1])/view_inv[15]
-    var x1_inv = mat4vec4mul(view_inv, [x0_gl[0]*w,x0_gl[1]*w,0,w]).slice(0, -1)
-    return x1_inv
+    var w = 1 / (m[3]*p[0] + m[7]*p[1] + m[11]*p[2] + m[15])
+    return w
 }
 
 function at4(row, col)
