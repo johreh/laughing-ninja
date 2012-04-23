@@ -103,8 +103,9 @@ function BillboardNode(localstack, projectionstack)
 
     this.calculateMatrix = function(rs)
     {
-        var pM = rs.transformstack[this.projectionstack][0]
-        var pM_inv = mat4inv(pM)
+        var pM_inv = mat4inv(mat4mul(
+            rs.transformstack[this.projectionstack][0], 
+            rs.transformstack[this.stack][0]))
 
         var v_right =   vec3norm(mat4vec3mul(pM_inv, [1, 0, 0]))
         var v_up =      vec3norm(mat4vec3mul(pM_inv, [0, 1, 0]))
