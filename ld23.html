@@ -6,6 +6,7 @@
             varying vec2 vTexCoord;
 
             uniform sampler2D uTexture;
+            uniform mat3 uTextureMatrix;
 
             void main(void)
             {
@@ -40,9 +41,10 @@
             var KEY_ENTER   = 13
             var KEY_SPACE   = 32
 
-            var gl
-            var g_shaderprogram
-            var g_timer
+            var PROJECTION_STACK = 0
+            var MODELVIEW_STACK = 1
+            var TEXTURE_STACK = 2
+            var ALL_MATRICES = [0, 1, 2]
 
             var gamesettings =
                 { dt: 33
@@ -112,6 +114,9 @@
                     ])
                 }
 
+            var gl
+            var g_shaderprogram
+            var g_timer
             var renderstate
             var gs = new GameState()
             var resources = new Resources()
@@ -150,6 +155,9 @@
 
                 // SceneGraph setup
                 this.sgroot = new SGNode()
+
+                // Updatables
+                this.actors = []
 
                 // View interaction
                 this.panning = false
@@ -202,6 +210,7 @@
                 // Render setup
                 var uModelViewMatrix = gl.getUniformLocation(g_shaderprogram, "uModelViewMatrix")
                 var uProjectionMatrix = gl.getUniformLocation(g_shaderprogram, "uProjectionMatrix")
+                var uTextureMatrix = gl.getUniformLocation(g_shaderprogram, "uTextureMatrix")
                 var uTexture = gl.getUniformLocation(g_shaderprogram, "uTexture")
                 var aVertexPosition = gl.getAttribLocation(g_shaderprogram, "aVertexPosition")
                 var aTexCoord = gl.getAttribLocation(g_shaderprogram, "aTexCoord")
@@ -209,7 +218,7 @@
                 renderstate = new RenderState(
                     gl,
                     new GfxStore(gl, resources, 2, 2, 2),
-                    [uProjectionMatrix, uModelViewMatrix],
+                    [uProjectionMatrix, uModelViewMatrix, uTextureMatrix],
                     aVertexPosition,
                     aTexCoord,
                     uTexture)
@@ -221,30 +230,31 @@
 
                 // SceneGraph setup
                 gs.sgroot
-                    .attach(new MatrixNode(renderstate.PROJECTION_STACK, projectionMatrix4(-1*aspect, 1*aspect, -1, 1, 1.5, 20)))
-                    .attach(gs.gameroot = new DollyNode(renderstate.PROJECTION_STACK))
+                    .attach(new MatrixNode(PROJECTION_STACK, projectionMatrix4(-1*aspect, 1*aspect, -1, 1, 1.5, 20)))
+                    .attach(gs.gameroot = new DollyNode(PROJECTION_STACK))
 
                 gs.sgroot
-                    .attach(gs.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, gs.screentransform))
+                    .attach(gs.uiroot = new MatrixNode(PROJECTION_STACK, gs.screentransform))
 
                 // World
                 gs.gameroot
-                    .attach(new BBoxNode(gs.hitboxes, 1))
-                    .attach(new ApplyTransform([0, 1]))
+                    .attach(new BBoxNode(gs.hitboxes, 1, [PROJECTION_STACK, MODELVIEW_STACK]))
+                    .attach(new ApplyTransform(ALL_MATRICES))
                     .attach(gs.gadget = new IndexedRenderNode("cubevertices", gl.TRIANGLES, "grass", "cubeindices", gl.UNSIGNED_BYTE))
 
                 gs.gameroot
-                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(0, 2, 0)))
-                    .attach(new BillboardNode(renderstate.MODELVIEW_STACK, renderstate.PROJECTION_STACK))
-                    .attach(new ApplyTransform([0, 1]))
+                    .attach(new MatrixNode(MODELVIEW_STACK, translationMatrix4(0, 1, 0)))
+                    .attach(new BillboardNode(MODELVIEW_STACK, PROJECTION_STACK))
+                    .attach(new MatrixNode(MODELVIEW_STACK, translationMatrix4(0, 1, 0)))
+                    .attach(new ApplyTransform(ALL_MATRICES))
                     .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
 
                 // UI
                 gs.uiroot
-                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(25,455,0)))
-                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(25, 25, 1)))
-                    .attach(new BBoxNode(gs.hitboxes, 2))
-                    .attach(new ApplyTransform([0, 1]))
+                    .attach(new MatrixNode(MODELVIEW_STACK, translationMatrix4(25,455,0)))
+                    .attach(new MatrixNode(MODELVIEW_STACK, scaleMatrix4(25, 25, 1)))
+                    .attach(new BBoxNode(gs.hitboxes, 2, [PROJECTION_STACK, MODELVIEW_STACK]))
+                    .attach(new ApplyTransform(ALL_MATRICES))
                     .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "pan"))
 
                 // Initial camera parameters

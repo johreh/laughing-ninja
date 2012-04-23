@@ -194,18 +194,23 @@ function CallbackNode(targetmode)
     this.onTraverse = function(rs) {}
 }
 
-function BBoxNode(bag, hitid)
+function BBoxNode(bag, hitid, stackorder)
 {
     CallbackNode.call(this, SGNode.CALLBACK)
+    this.stackorder = stackorder
     this.bag = bag
     this.id = hitid
 
     this.onTraverse = function(rs)
     {
-        var projectionM = rs.transformstack[rs.PROJECTION_STACK][0]
-        var modelViewM = rs.transformstack[rs.MODELVIEW_STACK][0]
-        var compositeMatrix = mat4mul(projectionM, modelViewM)
-        this.bag.push({"transform": compositeMatrix, "id": this.id})
+        var m = stackorder.reduce(function(prev, current, index, array)
+            {
+                var m1 = rs.transformstack[prev][0]
+                var m2 = rs.transformstack[current][0]
+                return mat4mul(m1, m2)
+            })
+
+        this.bag.push({"transform": m, "id": this.id})
     }
 }
 

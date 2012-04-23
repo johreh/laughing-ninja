@@ -1,8 +1,5 @@
 function RenderState(gl, gfxstore, matrixUniforms, aVertexPosition, aTexCoord, uTexture)
 {
-    this.PROJECTION_STACK = 0
-    this.MODELVIEW_STACK = 1
-
     this.gfxstore = gfxstore
 
     this.matrixUniforms = matrixUniforms
