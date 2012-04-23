@@ -223,12 +223,24 @@
                 gs.sgroot
                     .attach(new MatrixNode(renderstate.PROJECTION_STACK, projectionMatrix4(-1*aspect, 1*aspect, -1, 1, 1.5, 20)))
                     .attach(gs.gameroot = new DollyNode(renderstate.PROJECTION_STACK))
+
+                gs.sgroot
+                    .attach(gs.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, gs.screentransform))
+
+                // World
+                gs.gameroot
                     .attach(new BBoxNode(gs.hitboxes, 1))
                     .attach(new ApplyTransform([0, 1]))
                     .attach(gs.gadget = new IndexedRenderNode("cubevertices", gl.TRIANGLES, "grass", "cubeindices", gl.UNSIGNED_BYTE))
 
-                gs.sgroot
-                    .attach(gs.uiroot = new MatrixNode(renderstate.PROJECTION_STACK, gs.screentransform))
+                gs.gameroot
+                    .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(0, 2, 0)))
+                    .attach(new BillboardNode(renderstate.MODELVIEW_STACK, renderstate.PROJECTION_STACK))
+                    .attach(new ApplyTransform([0, 1]))
+                    .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
+
+                // UI
+                gs.uiroot
                     .attach(new MatrixNode(renderstate.MODELVIEW_STACK, translationMatrix4(25,455,0)))
                     .attach(new MatrixNode(renderstate.MODELVIEW_STACK, scaleMatrix4(25, 25, 1)))
                     .attach(new BBoxNode(gs.hitboxes, 2))
