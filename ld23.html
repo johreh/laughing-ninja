@@ -6,7 +6,7 @@
             varying vec2 vTexCoord;
 
             uniform sampler2D uTexture;
-            uniform mat3 uTextureMatrix;
+            uniform mat4 uTextureMatrix;
 
             void main(void)
             {
@@ -54,6 +54,7 @@
                 { "pan": "pan.png"
                 , "grass": "grass.png"
                 , "fox": "cubetexture.png"
+                , "sprites": "sprites.png"
                 }
 
             var meshlist = 
@@ -225,29 +226,82 @@
 
                 // Transform screen pixel-coordinates -> normalized WebGL coordinates
                 gs.screentransform = pixelTransform()
-
                 var aspect = aspectRatio()
+
+                var recordPOV = new SGNode()
+                recordPOV.update = function(rs)
+                {
+                    gs.pointofview = rs.transformstack[PROJECTION_STACK][0]
+                    this.updateChildren(rs)
+                }
 
                 // SceneGraph setup
                 gs.sgroot
                     .attach(new MatrixNode(PROJECTION_STACK, projectionMatrix4(-1*aspect, 1*aspect, -1, 1, 1.5, 20)))
-                    .attach(gs.gameroot = new DollyNode(PROJECTION_STACK))
+                    .attach(gs.cameramount = new DollyNode(PROJECTION_STACK))
+                    .attach(recordPOV)
+                    .attach(gs.gameroot = new MatrixNode(PROJECTION_STACK, scaleMatrix4(2, 2, 2)))
+                    .attach(new BBoxNode(gs.hitboxes, 1, [PROJECTION_STACK, MODELVIEW_STACK]))
+                    .attach(gs.gameroot = new MatrixNode(PROJECTION_STACK, scaleMatrix4(1/6, 1/6, 1/6)))
 
                 gs.sgroot
                     .attach(gs.uiroot = new MatrixNode(PROJECTION_STACK, gs.screentransform))
 
                 // World
-                gs.gameroot
-                    .attach(new BBoxNode(gs.hitboxes, 1, [PROJECTION_STACK, MODELVIEW_STACK]))
-                    .attach(new ApplyTransform(ALL_MATRICES))
-                    .attach(gs.gadget = new IndexedRenderNode("cubevertices", gl.TRIANGLES, "grass", "cubeindices", gl.UNSIGNED_BYTE))
 
-                gs.gameroot
-                    .attach(new MatrixNode(MODELVIEW_STACK, translationMatrix4(0, 1, 0)))
-                    .attach(new BillboardNode(MODELVIEW_STACK, PROJECTION_STACK))
-                    .attach(new MatrixNode(MODELVIEW_STACK, translationMatrix4(0, 1, 0)))
-                    .attach(new ApplyTransform(ALL_MATRICES))
-                    .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
+                // Matrix to "fold" tile face down
+                var fold_m = zeroMatrix4.slice(0)
+                fold_m[at4(2, 0)] = 1
+                fold_m[at4(0, 1)] = 1
+                fold_m[at4(1, 2)] = 1
+                fold_m[at4(3, 3)] = 1
+
+                for (var side = 0; side < 6; side++)
+                {
+                    // Rotation matrix to face each of the six sides of a cube
+                    var rot_m = zeroMatrix4.slice(0)
+                    rot_m[at4(0, (side + 0) % 3)] = side >= 3 ? -1 : 1
+                    rot_m[at4(1, (side + 1) % 3)] = side >= 3 ? -1 : 1
+                    rot_m[at4(2, (side + 2) % 3)] = side >= 3 ? -1 : 1
+                    rot_m[at4(3, 3)] = 1
+
+                    var sideroot = new MatrixNode(MODELVIEW_STACK, rot_m)
+                    gs.gameroot.attach(sideroot)
+
+                    for (var tileidx = 0; tileidx < 9; tileidx++)
+                    {
+                        var tile = 
+                            { "side": side
+                            }
+
+                        // Tile selection matrix
+                        var tex_m = identityMatrix4.slice(0)
+
+                        // Matrix to move tile to the "face" of the cube
+                        var pos_m = translationMatrix4(
+                            2*(tileidx % 3) - 2, 
+                            3, 
+                            2*Math.floor(tileidx / 3) - 2)
+
+
+                        // Attach tile
+                        sideroot
+                            .attach(new MatrixNode(MODELVIEW_STACK, pos_m))
+                            .attach(new MatrixNode(MODELVIEW_STACK, fold_m))
+                            .attach(tile.tex = new MatrixNode(TEXTURE_STACK, tex_m))
+                            .attach(new ApplyTransform(ALL_MATRICES))
+                            .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
+                    }
+
+                    var side_tex = identityMatrix4.slice(0)
+
+                    sideroot
+                        .attach(new MatrixNode(MODELVIEW_STACK, translationMatrix4(0, 6, 0)))
+                        .attach(new BillboardNode(MODELVIEW_STACK, PROJECTION_STACK))
+                        .attach(new MatrixNode(TEXTURE_STACK, side_tex))
+                        .attach(new ApplyTransform(ALL_MATRICES))
+                        .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
+                }
 
                 // UI
                 gs.uiroot
@@ -258,9 +312,9 @@
                     .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "pan"))
 
                 // Initial camera parameters
-                gs.gameroot.pitch = Math.PI/4
-                gs.gameroot.yaw = Math.PI/4
-                gs.gameroot.d = -5
+                gs.cameramount.pitch = -Math.PI/4
+                gs.cameramount.yaw = Math.PI/4
+                gs.cameramount.d = -5
 
                 // Game Loop
                 timerProxy()
@@ -350,16 +404,16 @@
                 switch(e.keyCode)
                 {
                     case KEY_LEFT:
-                        gs.gameroot.pan(Math.PI/10, 0)
+                        gs.cameramount.pan(Math.PI/10, 0)
                         break;
                     case KEY_RIGHT:
-                        gs.gameroot.pan(-Math.PI/10, 0)
+                        gs.cameramount.pan(-Math.PI/10, 0)
                         break;
                     case KEY_UP:
-                        gs.gameroot.pan(0, Math.PI/10)
+                        gs.cameramount.pan(0, Math.PI/10)
                         break;
                     case KEY_DOWN:
-                        gs.gameroot.pan(0, -Math.PI/10)
+                        gs.cameramount.pan(0, -Math.PI/10)
                         break;
                     case KEY_ENTER:
                         break;
@@ -381,19 +435,18 @@
                     switch(hits[0].hitid)
                     {
                         case 1:
-                            gs.pointofview = hits[0].transform
-                            if (e.button != 2)
+                            if (e.button == 0)
                             {
-                                gs.scanning = true
+                                gs.panning = true
                             }
                             else
                             {
-                                gs.panning = true
+                                gs.scanning = true
                             }
                             break
 
                         case 2:
-                            gs.gameroot.d += (e.button == 0) ? 1 : -1
+                            gs.cameramount.d += (e.button == 0) ? 1 : -1
                             break
 
                         default:
@@ -431,14 +484,14 @@
                         var x1_world = linePlaneIntersection(ray1.x0, ray1.v)
                         var v = vec3sub(x1_world, x0_world)
 
-                        gs.gameroot.scan(v[0], v[1], v[2])
+                        gs.cameramount.scan(v[0], v[1], v[2])
                     }
                     else if (gs.panning)
                     {
                         var v0_screen = vec3sub(x1_screen, x0_screen)
                         var v0_gl = mat4vec3mul(gs.screentransform, v0_screen)
                         var v0_rads = vec3scale(v0_gl, Math.PI)
-                        gs.gameroot.pan(v0_rads[0], -v0_rads[1])
+                        gs.cameramount.pan(v0_rads[0], -v0_rads[1])
                     }
                 }
             }
