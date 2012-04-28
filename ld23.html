@@ -10,7 +10,8 @@
 
             void main(void)
             {
-                gl_FragColor = texture2D(uTexture, vec2(vTexCoord.s, vTexCoord.t));
+                vec4 tx = uTextureMatrix * vec4(vTexCoord, 0, 1);
+                gl_FragColor = texture2D(uTexture, tx.st);
             }
         </script>
         <script id="vertexProgram" type="x-shader/x-vertex">
@@ -34,6 +35,9 @@
         <script type="text/javascript" src="scenegraph.js"></script>
         <script type="text/javascript" src="render.js"></script>
         <script type="text/javascript" charset="utf-8">
+            /*
+             * Key constants
+             */
             var KEY_LEFT    = 37
             var KEY_UP      = 38
             var KEY_RIGHT   = 39
@@ -41,10 +45,32 @@
             var KEY_ENTER   = 13
             var KEY_SPACE   = 32
 
+            /*
+             * Matrix stacks
+             */
             var PROJECTION_STACK = 0
             var MODELVIEW_STACK = 1
             var TEXTURE_STACK = 2
             var ALL_MATRICES = [0, 1, 2]
+
+            /*
+             * Terrain types
+             */
+            var DESERT = 0
+            var GRASS = 1
+            var FOREST = 2
+            var GRAIN = 3
+            var SHEEP = 4
+            var WATER = 5
+
+            /*
+             * Weather types
+             */
+            var CLEAR = 0
+            var CLOUD = 1
+            var RAIN = 2
+            var WIND = 3
+            var SUN = 4
 
             var gamesettings =
                 { dt: 33
@@ -59,10 +85,10 @@
 
             var meshlist = 
                 { "quad": new Float32Array(
-                    [ -1,  1, 0, 0, 1
-                    , -1, -1, 0, 0, 0
-                    ,  1,  1, 0, 1, 1
-                    ,  1, -1, 0, 1, 0
+                    [ -1,  1, 0, 0.01, 0.01
+                    , -1, -1, 0, 0.01, 0.99
+                    ,  1,  1, 0, 0.99, 0.01
+                    ,  1, -1, 0, 0.99, 0.99
                     ])
                 , "triangle": new Float32Array(
                     [  0.0,  1.0,  0.0, 0.5, 1
@@ -113,6 +139,62 @@
                     , 16, 17, 18,   16, 18, 19  // Right face
                     , 20, 21, 22,   20, 22, 23  // Left face
                     ])
+                }
+
+            var spritesheet =
+                { "xscale": 128/16
+                , "yscale": 128/16
+                , "texture": "sprites"
+                , "sprites":
+                    { "water":
+                        { "width": 1
+                        , "height": 1
+                        , "x": 0
+                        , "y": 0
+                        }
+                    , "desert":
+                        { "width": 1
+                        , "height": 1
+                        , "x": 1
+                        , "y": 0
+                        }
+                    , "plains":
+                        { "width": 1
+                        , "height": 1
+                        , "x": 0
+                        , "y": 1
+                        }
+                    , "forest":
+                        { "width": 1
+                        , "height": 1
+                        , "x": 1
+                        , "y": 1
+                        }
+                    , "sun": 
+                        { "width": 3
+                        , "height": 3
+                        , "x": 4
+                        , "y": 2
+                        }
+                    , "cloud": 
+                        { "width": 3
+                        , "height": 2
+                        , "x": 2
+                        , "y": 0
+                        }
+                    , "raincloud": 
+                        { "width": 3
+                        , "height": 2
+                        , "x": 5
+                        , "y": 0
+                        }
+                    , "wind":
+                        { "width": 4
+                        , "height": 3
+                        , "x": 0
+                        , "y": 2
+                        }
+                    }
                 }
 
             var gl
@@ -180,6 +262,8 @@
 
                 gl.enable(gl.BLEND)
                 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+
+                gl.cullFace(gl.BACK)
             }
 
             function checkGLError()
@@ -249,15 +333,21 @@
 
                 // World
 
-                // Matrix to "fold" tile face down
+                // Matrix to "fold" tile down to cube face
                 var fold_m = zeroMatrix4.slice(0)
                 fold_m[at4(2, 0)] = 1
                 fold_m[at4(0, 1)] = 1
                 fold_m[at4(1, 2)] = 1
                 fold_m[at4(3, 3)] = 1
 
+                gs.side = []
                 for (var side = 0; side < 6; side++)
                 {
+                    sidedata = 
+                        { "weather": randomWeather()
+                        , "tiles": []
+                        }
+
                     // Rotation matrix to face each of the six sides of a cube
                     var rot_m = zeroMatrix4.slice(0)
                     rot_m[at4(0, (side + 0) % 3)] = side >= 3 ? -1 : 1
@@ -270,12 +360,13 @@
 
                     for (var tileidx = 0; tileidx < 9; tileidx++)
                     {
-                        var tile = 
-                            { "side": side
+                        var tiledata =
+                            { "rain": 0
+                            , "sun": 0
+                            , "wind": 0
+                            , "cloud": 0
+                            , "terrain": randomTerrain()
                             }
-
-                        // Tile selection matrix
-                        var tex_m = identityMatrix4.slice(0)
 
                         // Matrix to move tile to the "face" of the cube
                         var pos_m = translationMatrix4(
@@ -283,24 +374,25 @@
                             3, 
                             2*Math.floor(tileidx / 3) - 2)
 
-
                         // Attach tile
-                        sideroot
-                            .attach(new MatrixNode(MODELVIEW_STACK, pos_m))
-                            .attach(new MatrixNode(MODELVIEW_STACK, fold_m))
-                            .attach(tile.tex = new MatrixNode(TEXTURE_STACK, tex_m))
-                            .attach(new ApplyTransform(ALL_MATRICES))
-                            .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
+                        tiledata.spritectrl = new SpriteControl(
+                            sideroot
+                                .attach(new MatrixNode(MODELVIEW_STACK, pos_m))
+                                .attach(new MatrixNode(MODELVIEW_STACK, fold_m))
+                            , spritesheet
+                            , terrainSprite(tiledata.terrain))
+
+                        sidedata.tiles.push(tiledata)
                     }
 
-                    var side_tex = identityMatrix4.slice(0)
+                    sidedata.spritectrl = new SpriteControl(
+                        sideroot
+                            .attach(new MatrixNode(MODELVIEW_STACK, translationMatrix4(0, 7, 0)))
+                            .attach(new BillboardNode(MODELVIEW_STACK, PROJECTION_STACK))
+                        , spritesheet
+                        , weatherSprite(sidedata.weather))
 
-                    sideroot
-                        .attach(new MatrixNode(MODELVIEW_STACK, translationMatrix4(0, 6, 0)))
-                        .attach(new BillboardNode(MODELVIEW_STACK, PROJECTION_STACK))
-                        .attach(new MatrixNode(TEXTURE_STACK, side_tex))
-                        .attach(new ApplyTransform(ALL_MATRICES))
-                        .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, "fox"))
+                    gs.side.push(sidedata)
                 }
 
                 // UI
@@ -314,10 +406,62 @@
                 // Initial camera parameters
                 gs.cameramount.pitch = -Math.PI/4
                 gs.cameramount.yaw = Math.PI/4
-                gs.cameramount.d = -5
+                gs.cameramount.d = -6
 
                 // Game Loop
                 timerProxy()
+            }
+
+            function randomTerrain()
+            {
+                return randomInt(5)
+            }
+
+            function randomWeather()
+            {
+                return randomInt(3)
+            }
+
+            function terrainSprite(terrain)
+            {
+                switch(terrain)
+                {
+                    case DESERT:
+                        return "desert"
+                    case GRASS:
+                        return "plains"
+                    case FOREST:
+                        return "forest"
+                    case GRAIN:
+                        return "plains"
+                    case SHEEP:
+                        return "plains"
+                    case WATER:
+                    default:
+                        return "water"
+                }
+            }
+
+            function weatherSprite(weather)
+            {
+                switch(weather)
+                {
+                    case CLOUD:
+                        return "cloud"
+                    case RAIN:
+                        return "raincloud"
+                    case WIND:
+                        return "wind"
+                    case SUN:
+                    case CLEAR:
+                    default:
+                        return "sun"
+                }
+            }
+
+            function randomInt(max)
+            {
+                return Math.floor(Math.random() * (max + 1))
             }
 
             function timerProxy()
@@ -329,6 +473,38 @@
 
             function update()
             {
+            }
+
+            function attachSprite(sgnode, spritesheet, sprite)
+            {
+                var ctrl = {}
+                return sgnode
+            }
+
+            function SpriteControl(sgnode, spritesheet, spriteid)
+            {
+                sgnode
+                    .attach(this.quaddimension = new MatrixNode(MODELVIEW_STACK, identityMatrix4))
+                    .attach(this.spriteroot = new MatrixNode(TEXTURE_STACK, scaleMatrix4(1/spritesheet.xscale, 1/spritesheet.yscale, 1)))
+                    .attach(this.translation = new MatrixNode(TEXTURE_STACK, identityMatrix4))
+                    .attach(this.texdimension = new MatrixNode(TEXTURE_STACK, identityMatrix4))
+                    .attach(new ApplyTransform(ALL_MATRICES))
+                    .attach(new RenderNode("quad", gl.TRIANGLE_STRIP, spritesheet.texture))
+
+                this.setTo = function(spriteid)
+                {
+                    var sprite = spritesheet.sprites[spriteid]
+                    this.quaddimension.matrix = scaleMatrix4(sprite.width, sprite.height, 1)
+                    this.translation.matrix = translationMatrix4(sprite.x, sprite.y, 0)
+                    this.texdimension.matrix = scaleMatrix4(sprite.width, sprite.height, 1)
+                }
+
+                this.detach = function()
+                {
+                    this.spriteroot.remove()
+                }
+
+                this.setTo(spriteid)
             }
 
             function invertRay(view_inv, x0_gl)
@@ -539,15 +715,18 @@
             }
         </script>
     </head>
-    <body onload="init()" onkeydown="onKeyDown(event)" onkeyup="onKeyUp(event)">
-        <canvas id="glcanvas" width="640" height="480" 
-            onmousedown="onMouseDown(event)"
-            onmouseup="onMouseUp(event)"
-            onmousemove="onMouseMove(event)"
-            oncontextmenu="return false">            
-Looks like there's no support for HTML5 Canvas =(
-        </canvas>
-        <div id="msg">
+    <body onload="init()" onkeydown="onKeyDown(event)" onkeyup="onKeyUp(event)" style="background: black;">
+        <div style="text-align: center;">
+            <canvas id="glcanvas" width="480" height="480" 
+                onmousedown="onMouseDown(event)"
+                onmouseup="onMouseUp(event)"
+                onmousemove="onMouseMove(event)"
+                oncontextmenu="return false"
+                style="">
+    Looks like there's no support for HTML5 Canvas =(
+            </canvas>
+            <div id="msg">
+            </div>
         </div>
     </body>
 </html>
